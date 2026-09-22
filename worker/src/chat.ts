@@ -272,7 +272,7 @@ chat.post("/chats/:id/messages", async (c) => {
   // The reply is timestamped just after the user turn it answers, so history
   // stays in turn order even if a later message arrives before this finishes.
   const storeReply = (async () => {
-    const { text: full, promptTokens, completionTokens, toolCredits, toolCostUsd } = await reply.done;
+    const { text: full, promptTokens, completionTokens, toolCredits, toolCostUsd, toolUses } = await reply.done;
     if (!full) return;
     // Charged from the gateway's own token counts. If the stream broke before
     // they arrived, estimate from the text rather than charge nothing. A
@@ -297,6 +297,15 @@ chat.post("/chats/:id/messages", async (c) => {
         completionTokens: tokensOut,
         costUsd: costUsdFor(chatRow.model, tokensIn, tokensOut) + toolCostUsd,
       }),
+      // What the reply spent outside Cloudflare, one row each, for the
+      // dashboard's external-services panel (migration 0010). Charged to the
+      // payer like the reply itself, but recorded against whoever asked, so a
+      // shared chat shows which person is doing the searching.
+      ...toolUses.map((use) =>
+        c.env.DB.prepare(
+          "INSERT INTO tool_calls (id, user_id, payer_id, chat_id, message_id, tool, host, ok, cost_usd, credits, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).bind(crypto.randomUUID(), userId, payerId, chatId, messageId, use.tool, use.host, use.ok ? 1 : 0, use.costUsd, use.credits, now + 1)
+      ),
     ]);
   })();
 

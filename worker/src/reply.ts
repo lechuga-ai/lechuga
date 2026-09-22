@@ -21,6 +21,12 @@ import config from "../config.json";
 
 export type Step = { id: string; label: string; links?: { title: string; url: string }[]; done: boolean };
 
+// One tool the model actually ran, for tool_calls (migration 0010). Counted,
+// not recorded: the arguments don't come along, only the tool's own logHost
+// where it has one. Who asked and who pays isn't known here — the caller
+// knows that, and fills it in when it stores these.
+export type ToolUse = { tool: string; host: string | null; ok: boolean; costUsd: number; credits: number };
+
 export type ReplyOutcome = {
   text: string;
   // Summed over every round, so the whole reply is charged, not just the last
@@ -30,6 +36,7 @@ export type ReplyOutcome = {
   toolCredits: number;
   toolCostUsd: number;
   steps: Step[];
+  toolUses: ToolUse[];
 };
 
 export function runReply(
@@ -54,7 +61,7 @@ export function runReply(
       if (opts.notice) send({ notice: opts.notice });
 
       const messages: ChatTurn[] = [...turns];
-      const outcome: ReplyOutcome = { text: "", promptTokens: 0, completionTokens: 0, toolCredits: 0, toolCostUsd: 0, steps: [] };
+      const outcome: ReplyOutcome = { text: "", promptTokens: 0, completionTokens: 0, toolCredits: 0, toolCostUsd: 0, steps: [], toolUses: [] };
       const schemas = toolSchemas(opts.tools);
       // The reply's own text is whatever the last round said; text from a
       // round that ended in a tool call is the model talking to itself.
@@ -121,13 +128,23 @@ export function runReply(
           let result: string;
           if (!tool) result = `There is no tool called ${call.function.name}.`;
           else {
+            // Recorded whether or not it works. A search that came back empty
+            // or broken still counted against Brave's 2,000 a month, and a
+            // dashboard that only counts the good ones reads low exactly when
+            // something is wrong.
+            const use: ToolUse = { tool: tool.name, host: tool.logHost?.(args) ?? null, ok: true, costUsd: 0, credits: 0 };
+            outcome.toolUses.push(use);
             try {
               const out = await tool.run(env, args);
               result = out.result;
               outcome.toolCredits += out.credits;
               outcome.toolCostUsd += out.costUsd;
+              use.credits = out.credits;
+              use.costUsd = out.costUsd;
+              use.ok = out.ok !== false;
               step.links = out.links;
             } catch (err) {
+              use.ok = false;
               result = `The tool failed: ${(err as Error).message}`;
             }
           }

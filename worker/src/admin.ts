@@ -263,3 +263,156 @@ admin.put("/users/:id/suspended", async (c) => {
   if (!r.meta.changes) return c.json({ error: "not found" }, 404);
   return c.json({ ok: true });
 });
+
+// The dashboard: what happened per day, who did it, and what we spent outside
+// Cloudflare. Everything here reads credit_ledger, which outlives the chats
+// and messages it came from, plus tool_calls (migration 0010) for the
+// services we pay per call.
+//
+// One caveat worth knowing when reading the numbers: a ledger row belongs to
+// whoever paid, which for a shared chat is the owner, not whoever typed. So
+// "people" below counts payers. tool_calls records who actually asked, so the
+// search figures are per-person in the way you'd expect.
+admin.get("/activity", async (c) => {
+  const days = Math.min(Math.max(Number(c.req.query("days")) || 30, 7), 180);
+  const offset = pacificOffsetSeconds();
+  // Midnight Pacific, `days` ago: a partial day at the near edge reads as a
+  // dip, so the window starts at a day boundary rather than "now minus n".
+  const startOfToday = Math.floor((Date.now() / 1000 + offset) / 86400) * 86400 - offset;
+  const since = (startOfToday - (days - 1) * 86400) * 1000;
+  const monthStart = pacificMonthStartMs();
+
+  const byDay = c.env.DB.prepare(
+    `SELECT date((created_at / 1000) + ?1, 'unixepoch') AS day,
+       COUNT(DISTINCT CASE WHEN reason = 'message' THEN user_id END) AS active_users,
+       COALESCE(SUM(CASE WHEN reason = 'message' THEN 1 END), 0) AS replies,
+       COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+       COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+       COALESCE(SUM(cost_usd), 0) AS cost_usd,
+       COALESCE(SUM(paid_cents), 0) AS paid_cents
+     FROM credit_ledger WHERE created_at >= ?2 GROUP BY day ORDER BY day`
+  ).bind(offset, since);
+
+  const byModelDay = c.env.DB.prepare(
+    `SELECT date((created_at / 1000) + ?1, 'unixepoch') AS day, model,
+       COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+       COALESCE(SUM(completion_tokens), 0) AS completion_tokens
+     FROM credit_ledger WHERE reason = 'message' AND created_at >= ?2 AND model IS NOT NULL
+     GROUP BY day, model ORDER BY day`
+  ).bind(offset, since);
+
+  const byModel = c.env.DB.prepare(
+    `SELECT model, COUNT(*) AS replies,
+       COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+       COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+       COALESCE(SUM(cost_usd), 0) AS cost_usd,
+       COALESCE(SUM(-delta), 0) AS credits_spent
+     FROM credit_ledger WHERE reason = 'message' AND created_at >= ? AND model IS NOT NULL
+     GROUP BY model ORDER BY prompt_tokens + completion_tokens DESC`
+  ).bind(since);
+
+  // Everyone who was charged for a reply in the window. Not capped: this is a
+  // few dozen people, and a cap would silently drop whoever is quiet today.
+  const people = c.env.DB.prepare(
+    `SELECT u.id, u.username, u.email, u.balance, u.suspended_at,
+       COUNT(*) AS replies,
+       COALESCE(SUM(l.prompt_tokens), 0) AS prompt_tokens,
+       COALESCE(SUM(l.completion_tokens), 0) AS completion_tokens,
+       COALESCE(SUM(-l.delta), 0) AS credits_spent,
+       COALESCE(SUM(l.cost_usd), 0) AS cost_usd,
+       MAX(l.created_at) AS last_at
+     FROM credit_ledger l JOIN user u ON u.id = l.user_id
+     WHERE l.reason = 'message' AND l.created_at >= ?
+     GROUP BY u.id ORDER BY prompt_tokens + completion_tokens DESC`
+  ).bind(since);
+
+  const [dayRows, modelDayRows, modelRows, peopleRows] = await Promise.all([
+    byDay.all(),
+    byModelDay.all(),
+    byModel.all(),
+    people.all(),
+  ]);
+
+  // tool_calls arrives with migration 0010. Until it has been run on this
+  // tier the rest of the page is still worth showing, so a missing table is
+  // reported rather than thrown: the panel says to run the migration.
+  let tools: unknown = null;
+  try {
+    const [toolDays, toolPeople, hosts, month] = await Promise.all([
+      c.env.DB.prepare(
+        `SELECT date((created_at / 1000) + ?1, 'unixepoch') AS day, tool,
+           COUNT(*) AS calls, COALESCE(SUM(cost_usd), 0) AS cost_usd,
+           COALESCE(SUM(CASE WHEN ok = 0 THEN 1 END), 0) AS failed
+         FROM tool_calls WHERE created_at >= ?2 GROUP BY day, tool ORDER BY day`
+      ).bind(offset, since).all(),
+      c.env.DB.prepare(
+        `SELECT t.user_id, u.username, u.email,
+           COALESCE(SUM(CASE WHEN t.tool = 'web_search' THEN 1 END), 0) AS searches,
+           COALESCE(SUM(CASE WHEN t.tool = 'read_page' THEN 1 END), 0) AS reads,
+           COALESCE(SUM(t.cost_usd), 0) AS cost_usd
+         FROM tool_calls t JOIN user u ON u.id = t.user_id
+         WHERE t.created_at >= ? GROUP BY t.user_id ORDER BY searches DESC`
+      ).bind(since).all(),
+      c.env.DB.prepare(
+        `SELECT host, COUNT(*) AS reads FROM tool_calls
+         WHERE tool = 'read_page' AND host IS NOT NULL AND created_at >= ?
+         GROUP BY host ORDER BY reads DESC LIMIT 12`
+      ).bind(since).all(),
+      // Brave's free tier is a calendar month, so this one ignores the
+      // window and counts from the 1st, Pacific.
+      c.env.DB.prepare("SELECT COUNT(*) AS searches FROM tool_calls WHERE tool = 'web_search' AND created_at >= ?")
+        .bind(monthStart)
+        .first<{ searches: number }>(),
+    ]);
+    tools = {
+      days: toolDays.results,
+      people: toolPeople.results,
+      hosts: hosts.results,
+      month_searches: month?.searches ?? 0,
+      free_quota: config.tools.web_search.free_per_month,
+      search_enabled: Boolean(c.env.BRAVE_SEARCH_API_KEY),
+    };
+  } catch (err) {
+    console.error("tool_calls unavailable", (err as Error).message);
+  }
+
+  return c.json({
+    days: dayRows.results,
+    model_days: modelDayRows.results,
+    models: modelRows.results,
+    people: peopleRows.results,
+    tools,
+    window: { days, since, start_of_today: startOfToday * 1000 },
+    markup: config.costs.markup,
+  });
+});
+
+// Pacific, because the rest of Lechuga is: the date the model is told, and
+// the day a person in California means when they say today. Worked out once
+// for now rather than per row, so a window spanning a clock change is an hour
+// out at the far edge — visible only if you're squinting at a single day.
+function pacificOffsetSeconds(): number {
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", timeZoneName: "longOffset" }).formatToParts(new Date());
+  const name = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT-08:00";
+  const m = /GMT([+-])(\d{2}):(\d{2})/.exec(name);
+  if (!m) return -8 * 3600;
+  const seconds = Number(m[2]) * 3600 + Number(m[3]) * 60;
+  return m[1] === "-" ? -seconds : seconds;
+}
+
+// Midnight Pacific on the 1st of the current month, as a millisecond stamp.
+function pacificMonthStartMs(): number {
+  const now = new Date();
+  const [month, day, year] = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+    .format(now)
+    .split("/")
+    .map(Number);
+  const offset = pacificOffsetSeconds();
+  void day;
+  return (Date.UTC(year, month - 1, 1) / 1000 - offset) * 1000;
+}

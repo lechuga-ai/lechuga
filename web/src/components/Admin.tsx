@@ -12,9 +12,10 @@ import {
   type Me,
 } from "../api";
 import { AdminAccounts } from "./AdminAccounts";
+import { AdminActivity } from "./AdminActivity";
 
 type Props = { me: Me };
-type Tab = "requests" | "invites" | "accounts";
+type Tab = "requests" | "invites" | "accounts" | "activity";
 
 function when(ms: number | string | null): string {
   if (!ms) return "";
@@ -22,8 +23,10 @@ function when(ms: number | string | null): string {
   return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
-// Admin area at /admin. Three tabs: the requests inbox, everyone's invites,
-// and accounts (credits, spend, payments; components/AdminAccounts.tsx).
+// Admin area at /admin. Four tabs: the requests inbox, everyone's invites,
+// accounts (credits, spend, payments; components/AdminAccounts.tsx) and the
+// dashboard (day by day, and what the outside services cost;
+// components/AdminActivity.tsx).
 export function Admin({ me }: Props) {
   const [tab, setTab] = useState<Tab>("requests");
   return (
@@ -42,6 +45,9 @@ export function Admin({ me }: Props) {
         <button type="button" className={tab === "invites" ? "active" : ""} onClick={() => setTab("invites")}>
           Invites
         </button>
+        <button type="button" className={tab === "activity" ? "active" : ""} onClick={() => setTab("activity")}>
+          Dashboard
+        </button>
         <button type="button" className={tab === "accounts" ? "active" : ""} onClick={() => setTab("accounts")}>
           Accounts
         </button>
@@ -49,6 +55,7 @@ export function Admin({ me }: Props) {
       {tab === "requests" && <Requests />}
       {tab === "invites" && <Invites />}
       {tab === "accounts" && <AdminAccounts myId={me.id} />}
+      {tab === "activity" && <AdminActivity />}
     </div>
   );
 }

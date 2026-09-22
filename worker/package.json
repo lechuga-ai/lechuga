@@ -35,6 +35,9 @@
     "db:migrate:local:0009": "wrangler d1 execute lechuga-dev --local --file=src/db/0009_sharing.sql",
     "db:migrate:dev:0009": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0009_sharing.sql",
     "db:migrate:prod:0009": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0009_sharing.sql",
+    "db:migrate:local:0010": "wrangler d1 execute lechuga-dev --local --file=src/db/0010_tool_calls.sql",
+    "db:migrate:dev:0010": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0010_tool_calls.sql",
+    "db:migrate:prod:0010": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0010_tool_calls.sql",
     "db:check:local": "wrangler d1 execute lechuga-dev --local --file=src/db/check_balances.sql",
     "db:check:dev": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/check_balances.sql",
     "db:check:prod": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/check_balances.sql"

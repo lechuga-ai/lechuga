@@ -58,12 +58,18 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
       <>
         <p>
           A model is trained once, on text collected up to some date, and then it's frozen. It knows nothing after that,
-          and it's often unsure what today's date even is. The models on Lechuga don't search the web, so they can't
-          catch up on their own.
+          and it's often unsure what today's date even is.
         </p>
         <p>
-          The fix is simple: give it the material. Paste in the article, drop in the PDF, and ask your question about
-          that. It reads what you give it far more reliably than it remembers what it was trained on.
+          It can catch up, though. Ask about something recent, or something it isn't sure of, and it will search the web
+          and open the pages that look right, answering from those with links to what it read. Each step shows above the
+          reply, so you can see where the answer came from. A search costs {config.tools.web_search.credits} credits, a
+          cent; reading a page is free.
+        </p>
+        <p>
+          When you already have the material, give it to the model anyway: paste in the article, drop in the PDF, and
+          ask your question about that. It reads what you give it far more reliably than it remembers what it was
+          trained on.
         </p>
       </>
     ),
