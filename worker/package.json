@@ -1,0 +1,49 @@
+{
+  "name": "lechuga-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy:dev": "wrangler deploy --env dev",
+    "deploy:prod": "wrangler deploy --env prod",
+    "db:migrate:local": "wrangler d1 execute lechuga-dev --local --file=src/db/0001_init.sql",
+    "db:migrate:dev": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0001_init.sql",
+    "db:migrate:prod": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0001_init.sql",
+    "db:migrate:local:0002": "wrangler d1 execute lechuga-dev --local --file=src/db/0002_auth.sql",
+    "db:migrate:dev:0002": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0002_auth.sql",
+    "db:migrate:prod:0002": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0002_auth.sql",
+    "db:migrate:local:0003": "wrangler d1 execute lechuga-dev --local --file=src/db/0003_invites.sql",
+    "db:migrate:dev:0003": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0003_invites.sql",
+    "db:migrate:prod:0003": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0003_invites.sql",
+    "db:migrate:local:0004": "wrangler d1 execute lechuga-dev --local --file=src/db/0004_terms.sql",
+    "db:migrate:dev:0004": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0004_terms.sql",
+    "db:migrate:prod:0004": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0004_terms.sql",
+    "db:migrate:local:0005": "wrangler d1 execute lechuga-dev --local --file=src/db/0005_credits.sql",
+    "db:migrate:dev:0005": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0005_credits.sql",
+    "db:migrate:prod:0005": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0005_credits.sql",
+    "db:migrate:local:0006": "wrangler d1 execute lechuga-dev --local --file=src/db/0006_trials.sql",
+    "db:migrate:dev:0006": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0006_trials.sql",
+    "db:migrate:prod:0006": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0006_trials.sql",
+    "db:migrate:local:0007": "wrangler d1 execute lechuga-dev --local --file=src/db/0007_admin_costs.sql",
+    "db:migrate:dev:0007": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0007_admin_costs.sql",
+    "db:migrate:prod:0007": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0007_admin_costs.sql",
+    "db:migrate:local:0008": "wrangler d1 execute lechuga-dev --local --file=src/db/0008_invite_sender.sql",
+    "db:migrate:dev:0008": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0008_invite_sender.sql",
+    "db:migrate:prod:0008": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0008_invite_sender.sql",
+    "db:migrate:local:0009": "wrangler d1 execute lechuga-dev --local --file=src/db/0009_sharing.sql",
+    "db:migrate:dev:0009": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0009_sharing.sql",
+    "db:migrate:prod:0009": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0009_sharing.sql",
+    "db:check:local": "wrangler d1 execute lechuga-dev --local --file=src/db/check_balances.sql",
+    "db:check:dev": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/check_balances.sql",
+    "db:check:prod": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/check_balances.sql"
+  },
+  "dependencies": {
+    "better-auth": "^1.7.5",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "typescript": "^5.6.0",
+    "wrangler": "^4.0.0"
+  }
+}

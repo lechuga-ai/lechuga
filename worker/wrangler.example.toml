@@ -1,0 +1,84 @@
+# A template for running your own copy. Copy it to wrangler.toml and fill in
+# the YOUR_... values: a Cloudflare account, two D1 databases (dev and prod),
+# an AI Gateway, a Turnstile widget, and optionally a Google OAuth client.
+# None of these values are secrets. The secrets (see .dev.vars.example) go in
+# with `npx wrangler secret put <NAME> --env dev|prod`.
+
+name = "lechuga"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Keeps the worker's logs and errors in the Cloudflare dashboard (Workers &
+# Pages > the worker > Observability) instead of only while `wrangler tail`
+# is watching. Applies to dev and prod. Error alerts are built on top of this.
+[observability]
+enabled = true
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+# By default static files are served before the worker runs, which skips the
+# www -> apex redirect in index.ts for pages like "/". Run the worker first;
+# it still serves assets itself through the ASSETS binding.
+run_worker_first = true
+# The SPA owns its paths (/admin, /invite/<token>, /terms, ...): anything that
+# isn't a real file gets index.html instead of a 404.
+not_found_handling = "single-page-application"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "lechuga-dev"
+database_id = "YOUR_DEV_D1_DATABASE_ID"
+
+[vars]
+AI_GATEWAY_ACCOUNT_ID = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+AI_GATEWAY_ID = "lechuga"
+TURNSTILE_SITE_KEY = "YOUR_TURNSTILE_SITE_KEY"
+GOOGLE_CLIENT_ID = "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com"
+# Where Better Auth builds absolute links (magic links, OAuth callbacks).
+# Local: the Vite URL, since that is what serves the SPA during `npm run dev`.
+BASE_URL = "http://localhost:5173"
+# BRAVE_SEARCH_API_KEY (from brave.com/search/api) lets the model search the
+# web while answering (worker/src/tools.ts). Optional: without it the model
+# can still read pages it's given, it just can't search. A secret, like the
+# others, and a line in .dev.vars for local.
+# ADMIN_EMAILS (comma-separated emails allowed into /admin, who also never
+# need an invite) is a secret, not a var, so nobody's address lives in the
+# repo: `npx wrangler secret put ADMIN_EMAILS --env dev|prod`, and a line in
+# .dev.vars for local. Until it's set on a tier, that tier has no admins.
+
+[env.dev]
+name = "lechuga-dev"
+routes = [{ pattern = "dev.example.com", custom_domain = true }]
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "lechuga-dev"
+database_id = "YOUR_DEV_D1_DATABASE_ID"
+
+[env.dev.vars]
+AI_GATEWAY_ACCOUNT_ID = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+AI_GATEWAY_ID = "lechuga"
+TURNSTILE_SITE_KEY = "YOUR_TURNSTILE_SITE_KEY"
+GOOGLE_CLIENT_ID = "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com"
+BASE_URL = "https://dev.example.com"
+
+[env.prod]
+name = "lechuga"
+routes = [
+  { pattern = "example.com", custom_domain = true },
+  { pattern = "www.example.com", custom_domain = true },
+]
+
+[[env.prod.d1_databases]]
+binding = "DB"
+database_name = "lechuga-prod"
+database_id = "YOUR_PROD_D1_DATABASE_ID"
+
+[env.prod.vars]
+AI_GATEWAY_ACCOUNT_ID = "YOUR_CLOUDFLARE_ACCOUNT_ID"
+AI_GATEWAY_ID = "lechuga"
+TURNSTILE_SITE_KEY = "YOUR_TURNSTILE_SITE_KEY"
+GOOGLE_CLIENT_ID = "YOUR_GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com"
+BASE_URL = "https://example.com"

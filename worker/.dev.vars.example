@@ -1,0 +1,52 @@
+# Copy to .dev.vars (gitignored). Local development needs NO shared secrets:
+# the quick start below gets sign-in working with values you make up yourself.
+# Only CF_API_TOKEN is a real credential, and only chat replies need it.
+#
+# Quick start for a new machine:
+#   1. cp .dev.vars.example .dev.vars, then fill in BETTER_AUTH_SECRET.
+#   2. From worker/, run each local migration once, in order:
+#        npm run db:migrate:local, then db:migrate:local:0002 ... ... :0009
+#   3. npm run dev from the repo root, open http://localhost:5173, sign in
+#      with an admin email (ADMIN_EMAILS). With no RESEND_API_KEY the magic
+#      link isn't emailed: it's printed in the terminal running npm run dev.
+
+# CF_API_TOKEN: your own Cloudflare API token (you need to be a member of the
+# account), scoped to Workers AI + AI Gateway Read. Without it everything
+# works except the model's replies.
+CF_API_TOKEN=
+
+# BETTER_AUTH_SECRET: signs session cookies. Any long random string of your
+# own; generate one with `openssl rand -base64 32`. Never shared between
+# machines or tiers.
+BETTER_AUTH_SECRET=
+
+# Turnstile (the bot check on the sign-in form). These two are Cloudflare's
+# published test keys, which always pass; they are not secrets. The site key
+# here overrides the real one in wrangler.toml for local runs only. Dev and
+# prod use the real pair, set with `wrangler secret put`.
+TURNSTILE_SITE_KEY=1x00000000000000000000000000000000AA
+TURNSTILE_SECRET=1x0000000000000000000000000000000AA
+
+# RESEND_API_KEY: optional locally. Sends magic-link and invite email from
+# hello@lechuga.ai. Leave empty and links are printed to the terminal instead.
+RESEND_API_KEY=
+# GOOGLE_CLIENT_SECRET: optional. Google sign-in is offered only when this is
+# set (the matching GOOGLE_CLIENT_ID is public and lives in wrangler.toml).
+GOOGLE_CLIENT_SECRET=
+
+# ADMIN_EMAILS: comma-separated emails that can open /admin. The app is invite
+# only and admins never need an invite, so your own email here is also how
+# you get into a fresh local database. On dev and prod it's a secret.
+ADMIN_EMAILS=you@example.com
+
+# Web search, optional. A key from brave.com/search/api lets the model search
+# the web while it answers (worker/src/tools.ts); without it, it can still
+# read pages it's given. On dev and prod it's a secret.
+BRAVE_SEARCH_API_KEY=
+
+# Phase 3 (billing), optional locally. Without STRIPE_SECRET_KEY the billing
+# page says buying isn't open and nobody is stopped at zero credits. If set:
+# the restricted Stripe key (starts with rk_), never the full-access one
+# (sk_), and the signing secret of the dev webhook.
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=

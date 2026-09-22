@@ -1,0 +1,12 @@
+{
+  "name": "lechuga",
+  "private": true,
+  "license": "MIT",
+  "workspaces": ["worker", "web"],
+  "scripts": {
+    "dev": "npm run dev --workspace worker & npm run dev --workspace web & wait",
+    "build": "npm run build --workspace web",
+    "deploy:dev": "npm run build --workspace web && npm run deploy:dev --workspace worker",
+    "deploy:prod": "npm run build --workspace web && npm run deploy:prod --workspace worker"
+  }
+}
