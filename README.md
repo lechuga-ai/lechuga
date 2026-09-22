@@ -100,6 +100,8 @@ Open **http://localhost:5173** (Vite, with hot reload; it proxies `/api` to the 
 
 If the page loads but shows no model picker, the worker half of `npm run dev` has died while Vite kept going. Stop it and start it again.
 
+`npm run build` puts the built app in `worker/public`, which is what the deployed worker serves. You don't need it for local work — Vite serves the app itself — but run it once if you want to see exactly what gets deployed.
+
 ## Deploying your own
 
 Create two D1 databases, an AI Gateway, and a Turnstile widget, and put their ids in `wrangler.toml`. Then, per tier (`dev`, `prod`), from `worker/`:
