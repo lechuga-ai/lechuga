@@ -15,6 +15,12 @@ export type ToolDef = {
   available: (env: Env) => boolean;
   // What the chat shows while it runs, and after: "Searched: …", "Read: …".
   label: (args: Record<string, unknown>) => string;
+  // The one thing about the call that is kept in tool_calls (migration 0010),
+  // for a tool where knowing which service was reached is worth more than the
+  // privacy it costs. A hostname, never a path or a query string, and leave it
+  // off entirely unless the answer is clearly harmless: web_search doesn't
+  // have one, because what someone searched for is theirs.
+  logHost?: (args: Record<string, unknown>) => string | null;
   run: (env: Env, args: Record<string, unknown>) => Promise<ToolOutcome>;
 };
 
@@ -29,6 +35,10 @@ export type ToolOutcome = {
   // Something for the chat to show or link: the pages a search found, or the
   // page that was read.
   links?: { title: string; url: string }[];
+  // False when the service was reached and misbehaved, so tool_calls can tell
+  // a working search from a failing one. A call that never left here (an
+  // address we refuse to fetch) isn't a failure of theirs; leave it unset.
+  ok?: boolean;
 };
 
 const T = config.tools;
@@ -59,7 +69,7 @@ const webSearch: ToolDef = {
     const cost = { costUsd: T.web_search.cost_usd, credits: T.web_search.credits };
     if (!res.ok) {
       console.error("brave search failed", res.status, (await res.text()).slice(0, 200));
-      return { result: "The search failed; say so, and answer from what you know.", ...cost };
+      return { result: "The search failed; say so, and answer from what you know.", ok: false, ...cost };
     }
     const data = (await res.json()) as { web?: { results?: { title?: string; url?: string; description?: string; age?: string }[] } };
     const results = (data.web?.results ?? []).filter((r) => r.url && r.title);
@@ -84,6 +94,16 @@ const readPage: ToolDef = {
   },
   available: () => true,
   label: (args) => `Read: ${hostOf(String(args.url ?? ""))}`,
+  // Not hostOf: that falls back to the raw string so the chat has something
+  // to show, and the raw string is whatever the model made up. Stored, it
+  // would be a text column quietly holding model output. Only a real host.
+  logHost: (args) => {
+    try {
+      return new URL(String(args.url ?? "")).hostname;
+    } catch {
+      return null;
+    }
+  },
   async run(env, args) {
     const free = { costUsd: 0, credits: 0 };
     let url: URL;
@@ -106,9 +126,9 @@ const readPage: ToolDef = {
         signal: AbortSignal.timeout(T.timeout_ms),
       });
     } catch (err) {
-      return { result: `Couldn't reach ${url.hostname}: ${(err as Error).message}`, ...free };
+      return { result: `Couldn't reach ${url.hostname}: ${(err as Error).message}`, ok: false, ...free };
     }
-    if (!res.ok) return { result: `${url.hostname} answered ${res.status}.`, ...free };
+    if (!res.ok) return { result: `${url.hostname} answered ${res.status}.`, ok: false, ...free };
     const type = res.headers.get("content-type") ?? "";
     const raw = await res.arrayBuffer();
     if (raw.byteLength > T.read_page.max_bytes) return { result: "That page is too large to read.", ...free };
@@ -129,7 +149,7 @@ const readPage: ToolDef = {
       });
       const data = (await conv.json().catch(() => null)) as { success?: boolean; result?: { data?: string }[] } | null;
       const md = data?.result?.[0]?.data;
-      if (!conv.ok || typeof md !== "string") return { result: `Couldn't read the page at ${url.hostname}.`, ...free };
+      if (!conv.ok || typeof md !== "string") return { result: `Couldn't read the page at ${url.hostname}.`, ok: false, ...free };
       const contents = md.indexOf("## Contents");
       text = contents >= 0 ? md.slice(contents + "## Contents".length) : md;
     }

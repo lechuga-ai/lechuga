@@ -526,3 +526,63 @@ export async function convertFile(file: File): Promise<{ name: string; text: str
 export async function compactChat(chatId: string): Promise<{ credits: number }> {
   return expectJson(await postJson(`/api/chats/${chatId}/compact`, {}));
 }
+
+// The dashboard (components/AdminActivity.tsx). Days are Pacific and come
+// back as "YYYY-MM-DD", already grouped; anything the window has no rows for
+// is simply absent, so the chart fills the gaps rather than the query.
+export type AdminActivityDay = {
+  day: string;
+  active_users: number;
+  replies: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number;
+  paid_cents: number;
+};
+
+export type AdminActivityModelDay = { day: string; model: string; prompt_tokens: number; completion_tokens: number };
+
+export type AdminActivityModel = {
+  model: string;
+  replies: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  cost_usd: number;
+  credits_spent: number;
+};
+
+export type AdminActivityPerson = {
+  id: string;
+  username: string | null;
+  email: string;
+  balance: number;
+  suspended_at: number | null;
+  replies: number;
+  prompt_tokens: number;
+  completion_tokens: number;
+  credits_spent: number;
+  cost_usd: number;
+  last_at: number;
+};
+
+// null until migration 0010 has been run on this tier.
+export type AdminActivityTools = {
+  days: { day: string; tool: string; calls: number; cost_usd: number; failed: number }[];
+  people: { user_id: string; username: string | null; email: string; searches: number; reads: number; cost_usd: number }[];
+  hosts: { host: string; reads: number }[];
+  month_searches: number;
+  free_quota: number;
+  search_enabled: boolean;
+} | null;
+
+export async function adminActivity(days: number): Promise<{
+  days: AdminActivityDay[];
+  model_days: AdminActivityModelDay[];
+  models: AdminActivityModel[];
+  people: AdminActivityPerson[];
+  tools: AdminActivityTools;
+  window: { days: number; since: number; start_of_today: number };
+  markup: number;
+}> {
+  return expectJson(await fetch(`/api/admin/activity?days=${days}`));
+}

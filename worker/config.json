@@ -69,7 +69,7 @@
     "_comment": "What the model may reach for while answering (worker/src/tools.ts). A search is Brave's $5 per 1,000, at the same markup as the models: 1 credit is $0.0001, so 100 credits is a cent. Reading a page costs us nothing.",
     "max_rounds": 4,
     "timeout_ms": 15000,
-    "web_search": { "results": 6, "cost_usd": 0.005, "credits": 100 },
+    "web_search": { "results": 6, "cost_usd": 0.005, "credits": 100, "free_per_month": 2000 },
     "read_page": { "max_bytes": 3000000, "max_chars": 14000 }
   },
   "stripe_managed_payments": true,
