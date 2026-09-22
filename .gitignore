@@ -1,5 +1,9 @@
 node_modules/
 worker/public/
+# Your own Cloudflare ids: copy wrangler.example.toml to wrangler.toml and
+# fill it in. Ours is kept in the private ops repo, not here.
+worker/wrangler.toml
+
 .dev.vars
 .env
 .env.*

@@ -153,6 +153,12 @@ eval/sharing_test.sh                                     # who can see a chat, w
 eval/tools_test.sh                                       # the model reads a page and (with a Brave key) searches; makes its own account
 ```
 
+## Contributing
+
+This is where Lechuga is actually built, so what you see is the live state, alpha and all. Issues and pull requests are welcome; it's a side project run by two people, so replies may not be quick.
+
+`worker/wrangler.toml` is deliberately absent and gitignored: it holds one deployment's Cloudflare ids. Copy `worker/wrangler.example.toml` to it and fill in your own.
+
 ## Licence
 
 MIT: use it, change it, run your own, sell it if you like. See [LICENSE](LICENSE). The name "Lechuga" and the logo are ours; a copy that isn't ours should wear its own name.
