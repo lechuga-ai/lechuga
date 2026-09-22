@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "_comment_predev": "wrangler dev refuses to start unless the assets directory exists, and it is gitignored, so a fresh clone has none. Locally Vite serves the app on 5173 and the worker only answers /api, so an empty directory is enough; npm run build fills it properly.",
+    "predev": "node -e \"require('fs').mkdirSync('public', { recursive: true })\"",
     "dev": "wrangler dev",
     "deploy:dev": "wrangler deploy --env dev",
     "deploy:prod": "wrangler deploy --env prod",
