@@ -68,6 +68,19 @@ export function runReply(
       for (let round = 0; round <= config.tools.max_rounds; round++) {
         // On the last allowed round the tools are withheld, so it has to answer.
         const withTools = round < config.tools.max_rounds ? schemas : [];
+        // Withholding them silently is the trap described in chat.ts: the
+        // preamble it is still carrying says it has tools, so GLM writes the
+        // call it wanted into its answer as text and that becomes the reply
+        // (seen on prod, 2026-09-22: five rounds spent, then a literal
+        // <tool_call> where the answer should have been, charged in full).
+        // Telling it the tools are gone is what turns that into an answer.
+        if (schemas.length > 0 && withTools.length === 0) {
+          messages.push({
+            role: "system",
+            content:
+              "You have used every tool round this reply allows, so the tools are gone now. Answer from what you already have, in your own words. Don't write a tool call: written into an answer it does nothing, and the person sees the markup. If something is still unchecked, say so plainly and answer around it.",
+          });
+        }
         let upstream;
         try {
           upstream = await streamChat(env, model, messages, { maxTokens: opts.maxTokens, effort: opts.effort, tools: withTools });
@@ -106,6 +119,22 @@ export function runReply(
         outcome.completionTokens = usage.completionTokens === null || outcome.completionTokens === null ? null : outcome.completionTokens + usage.completionTokens;
 
         if (calls.size === 0) {
+          // Even told the tools are gone, GLM sometimes writes the call it
+          // wanted in its own markup and stops. That isn't an answer: take
+          // it out, and if nothing is left say so instead of showing it.
+          // An empty reply is neither stored nor charged (chat.ts), the same
+          // as one that never arrived, so the person doesn't pay for markup.
+          if (withTools.length === 0 && schemas.length > 0 && text.includes("<tool_call>")) {
+            const cleaned = text.replace(/<tool_call>[\s\S]*?(?:<\/tool_call>|$)/g, "").trim();
+            // The markup already went out as deltas; redraw without it.
+            send({ retract: true });
+            if (!cleaned) {
+              send({ error: "the model ran out of tool rounds before it answered; ask again, or ask for less at once" });
+              break;
+            }
+            send({ delta: cleaned });
+            text = cleaned;
+          }
           outcome.text = text;
           break;
         }
