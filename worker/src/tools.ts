@@ -49,7 +49,15 @@ const webSearch: ToolDef = {
     "Search the web. Use it for anything that may have changed since your training data ends (news, prices, versions, schedules, who holds which job), for facts you aren't sure of, and when the person asks you to look something up. Returns titles, addresses and a short description of each page; use read_page on the ones that matter.",
   parameters: {
     type: "object",
-    properties: { query: { type: "string", description: "What to search for, as you'd type it into a search engine" } },
+    properties: {
+      query: { type: "string", description: "What to search for, as you'd type it into a search engine" },
+      freshness: {
+        type: "string",
+        enum: ["pd", "pw", "pm", "py"],
+        description:
+          "Only pages from the past day, week, month or year. Set it when the person wants what's current (news, results, prices, who holds a job); leave it off otherwise, since it drops older pages that may be the best ones.",
+      },
+    },
     required: ["query"],
   },
   available: (env) => Boolean(env.BRAVE_SEARCH_API_KEY),
@@ -61,16 +69,30 @@ const webSearch: ToolDef = {
     url.searchParams.set("q", query);
     url.searchParams.set("count", String(T.web_search.results));
     url.searchParams.set("text_decorations", "false");
-    const res = await fetch(url, {
-      headers: { accept: "application/json", "X-Subscription-Token": env.BRAVE_SEARCH_API_KEY! },
-      signal: AbortSignal.timeout(T.timeout_ms),
-    });
-    // Every call is billed, even one that finds nothing.
-    const cost = { costUsd: T.web_search.cost_usd, credits: T.web_search.credits };
+    // The model's call, not the person's: they only ever see the query.
+    const freshness = String(args.freshness ?? "");
+    if (["pd", "pw", "pm", "py"].includes(freshness)) url.searchParams.set("freshness", freshness);
+    const call = () =>
+      fetch(url, {
+        headers: { accept: "application/json", "X-Subscription-Token": env.BRAVE_SEARCH_API_KEY! },
+        signal: AbortSignal.timeout(T.timeout_ms),
+      });
+    let res = await call();
+    // The free tier allows one query a second across everyone, so two people
+    // searching at once is a 429. Once more after a beat, then give up.
+    if (res.status === 429) {
+      await new Promise((r) => setTimeout(r, 1100));
+      res = await call();
+    }
     if (!res.ok) {
       console.error("brave search failed", res.status, (await res.text()).slice(0, 200));
-      return { result: "The search failed; say so, and answer from what you know.", ok: false, ...cost };
+      // Not charged: Brave doesn't count a refused call against the quota or
+      // the bill, and it was our failure, not theirs. ok: false keeps it on
+      // the dashboard, where a run of these is the thing to notice.
+      return { result: "The search failed; say so, and answer from what you know.", ok: false, costUsd: 0, credits: 0 };
     }
+    // Every answered call is billed, even one that finds nothing.
+    const cost = { costUsd: T.web_search.cost_usd, credits: T.web_search.credits };
     const data = (await res.json()) as { web?: { results?: { title?: string; url?: string; description?: string; age?: string }[] } };
     const results = (data.web?.results ?? []).filter((r) => r.url && r.title);
     if (results.length === 0) return { result: `No results for "${query}".`, ...cost };

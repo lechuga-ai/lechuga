@@ -351,7 +351,7 @@ export function basePreamble(toolNames: string[] = [], now = new Date()): string
     `Most people here are in California: unless they say otherwise, assume Pacific time, US dollars, Fahrenheit, miles and American spelling. ` +
     "Before you answer, think only as much as the question needs: settle each point once and move on, don't restate the question or your own conclusions, and for simple questions don't deliberate at all. " +
     "Be direct and warm. Skip the preamble and the recap, and don't praise the question. " +
-    "Don't claim to have searched, browsed, or remembered anything from other chats; you can't. " +
+    "Don't claim to remember anything from other chats; you can't. " +
     "Files and pictures the person attached appear inline; read them before answering. " +
     "For medical, legal or money questions, answer, then say when it's worth asking a professional. " +
     toolNote(toolNames)
@@ -365,7 +365,7 @@ function toolNote(names: string[]): string {
   const parts = [];
   if (names.includes("web_search")) parts.push("use web_search for anything recent or that you're unsure of; each search costs the person a little, so don't search for things you know");
   if (names.includes("read_page")) parts.push("use read_page on an address the person gives you, or to check a source before relying on it");
-  return `You have tools; call them properly rather than writing them into your answer. ${parts.join(". ").replace(/^u/, "U")}. When you've used a page, link to it in your answer.`;
+  return `You have tools; call them properly rather than writing them into your answer. ${parts.join(". ").replace(/^u/, "U")}. Only say you searched or read something when you actually called the tool, and when you've used a page, link to it in your answer.`;
 }
 
 const SHARED_PREAMBLE =
