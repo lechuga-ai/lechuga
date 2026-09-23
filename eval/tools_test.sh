@@ -2,7 +2,9 @@
 # The model's tools (worker/src/tools.ts): a throwaway local account asks for
 # a page to be read, and the reply stream should show a step for it and an
 # answer that came from the page. With BRAVE_SEARCH_API_KEY in .dev.vars a
-# search is tried too. Costs a few hundred tokens from the shared gateway.
+# search is tried too. Each call should also leave a row in tool_calls
+# (migration 0010): the host for a read, never the query for a search.
+# Costs a few hundred tokens from the shared gateway.
 #
 #   eval/tools_test.sh                        (needs a local `npm run dev`)
 #   BASE_URL=http://localhost:8799 eval/tools_test.sh
@@ -72,6 +74,9 @@ echo "$OUT" | sed 's/^/      /'
 check "a read step happened" "yes" "$(echo "$OUT" | grep -q 'labels=.*Read: example.com' && echo yes || echo no)"
 check "the answer mentions what the page says" "yes" "$(echo "$OUT" | grep -qi 'illustrative\|examples\|documentation\|domain' && echo yes || echo no)"
 check "a private address is refused" "yes" "$(stream 'Read http://127.0.0.1:8080/secret and tell me exactly what the tool said, quoting it.' | grep -qi "can't be read" && echo yes || echo no)"
+sleep 2
+READS=$(d1 "SELECT COUNT(*) AS n FROM tool_calls WHERE user_id = '$ID' AND tool = 'read_page' AND host = 'example.com'" | pick "d[0]['results'][0]['n']")
+check "the read was recorded in tool_calls with the host only" "yes" "$([[ "${READS:-0}" =~ ^[0-9]+$ && "${READS:-0}" -ge 1 ]] && echo yes || echo "no, $READS")"
 
 if [[ "$HAS_BRAVE" != "0" ]]; then
   echo "=== web_search ==="
@@ -81,6 +86,8 @@ if [[ "$HAS_BRAVE" != "0" ]]; then
   sleep 3
   CREDITS=$(d1 "SELECT COALESCE(MAX(credits), 0) AS c FROM messages WHERE chat_id = '$CHAT' AND role = 'assistant'" | pick "d[0]['results'][0]['c']")
   check "the search was charged (reply cost over 100 credits)" "yes" "$([[ "${CREDITS:-0}" =~ ^[0-9]+$ && "${CREDITS:-0}" -gt 100 ]] && echo yes || echo "no, $CREDITS")"
+  SEARCHES=$(d1 "SELECT COUNT(*) AS n FROM tool_calls WHERE user_id = '$ID' AND tool = 'web_search' AND host IS NULL AND credits = 100" | pick "d[0]['results'][0]['n']")
+  check "the search was recorded in tool_calls, costed, with nothing typed kept" "yes" "$([[ "${SEARCHES:-0}" =~ ^[0-9]+$ && "${SEARCHES:-0}" -ge 1 ]] && echo yes || echo "no, $SEARCHES")"
 else
   echo "(no BRAVE_SEARCH_API_KEY in .dev.vars: search not tested)"
 fi
