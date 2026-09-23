@@ -1016,13 +1016,16 @@ button {
 }
 
 /* The start of the row: the attach button, then whatever the page put in
-   `leading`. It takes the slack, so the model and send button stay right. */
+   `leading`. It takes the slack, so the model and send button stay right.
+   It never shrinks: with min-width 0 it collapsed under its contents on a
+   phone and the Share button spilled out of it over the model's name
+   (2026-09-22). When the row is short of room, the model label gives. */
 .composer-start {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-right: auto;
-  min-width: 0;
+  flex-shrink: 0;
 }
 
 .attach-btn {
@@ -3511,6 +3514,19 @@ button {
   font-size: 13px;
   color: var(--box-faint);
   white-space: nowrap;
+  /* The one thing in the row that shrinks (.composer-start doesn't): a
+     label, not a control, trimmed to an ellipsis rather than overflowing. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* On a phone there isn't room for all four, so the model goes: the meter
+   under every reply already says which one wrote it. */
+@media (max-width: 560px) {
+  .model-fixed {
+    display: none;
+  }
 }
 
 /* On the home page it's only a label for the free chat's model, so it
