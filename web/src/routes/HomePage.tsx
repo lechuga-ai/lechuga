@@ -5,6 +5,12 @@ import { SiteFooter } from "../components/SiteFooter";
 import { WhereItGoes } from "../components/WhereItGoes";
 import { randomEmptyLine } from "../emptyLine";
 import type { Model } from "../api";
+import config from "../../../worker/config.json";
+
+const PACKS = config.credit_packs;
+const SUB = config.subscription;
+const MARKUP = config.costs.markup === 2 ? "twice" : `${config.costs.markup} times`;
+const perMillion = (credits: number) => `$${(credits / 10000).toFixed(2)}`;
 
 type Props = {
   models: Model[];
@@ -28,8 +34,9 @@ type Section = {
 // In Cynthia's voice, like the About page: plain, warm, explaining as it
 // goes, no punchline sentences. Keep the numbers true (they're checked against
 // config.json and Artificial Analysis) and keep the section ids: the footer
-// links to them.
-const SECTIONS: Section[] = [
+// links to them. Shown here and again on /welcome for people who are signed
+// in (routes/WelcomePage.tsx).
+export const HOME_SECTIONS: Section[] = [
   {
     id: "what-it-is",
     title: "What it is",
@@ -81,12 +88,11 @@ const SECTIONS: Section[] = [
     title: "What it costs",
     paragraphs: [
       {
-        text:
-          "You start with some credits from us. After that, $5 buys credits and $10 buys twice as many; you pay once and use them whenever you like, and they don't expire. If you'd rather, it's $5 a month, and whatever you don't use rolls over. You can cancel at any time and keep what's left.",
+        text: `You start with ${config.starter_credits.toLocaleString()} credits from us. After that, ${PACKS.map((p) => `$${p.usd} buys ${p.credits.toLocaleString()}`).join(" and ")}; you pay once and use them whenever you like, and they don't expire. If you'd rather, it's $${SUB.usd} a month for ${SUB.credits.toLocaleString()} credits each month, and whatever you don't use rolls over. You can cancel at any time and keep what's left.`,
       },
       {
         text:
-          "A dollar of credits is enough for hundreds of ordinary messages, and a long chat with a big document in it costs more. Every reply shows what it cost, and your balance is always in view.",
+          "10,000 credits is a dollar of use, which is enough for hundreds of ordinary messages; a long chat with a big document in it costs more. Every reply shows what it cost, and your balance is always in view.",
       },
     ],
   },
@@ -95,8 +101,7 @@ const SECTIONS: Section[] = [
     title: "Where the money goes",
     paragraphs: [
       {
-        text:
-          "We publish our numbers, because it's the only way you can tell whether a price is fair. Right now Cloudflare charges us $0.15 per million input tokens and $0.50 per million output tokens for GLM 5.3 Flash, and we charge twice that. The other half covers card fees, the server bill, the domains, the free chat on this page, the occasional refund, and then us. If our costs come down, so do our prices. Here's how a purchase splits up:",
+        text: `We publish our numbers, because it's the only way you can tell whether a price is fair. We charge ${MARKUP} what Cloudflare charges us to run each model, and that's the whole pricing model. The other half covers card fees, the server bill, the domains, the free chat on the home page, the occasional refund, and then us. If our costs come down, so do our prices. Here's how a purchase splits up:`,
       },
     ],
   },
@@ -121,6 +126,72 @@ const SECTIONS: Section[] = [
     ],
   },
 ];
+
+// One section's paragraphs, and the cost breakdown under the one about costs.
+export function HomeSectionBody({ section }: { section: Section }) {
+  return (
+    <>
+      {section.paragraphs.map((p, i) => (
+        <p key={i}>
+          {p.lead && <strong>{p.lead} </strong>}
+          {p.text}
+          {p.source && (
+            <>
+              {" "}
+              <a className="marketing-source" href={p.source.href} target="_blank" rel="noopener">
+                Source: {p.source.label}
+              </a>
+            </>
+          )}
+        </p>
+      ))}
+      {section.id === "what-it-costs-us" && (
+        <>
+          <WhereItGoes />
+          <ModelRates />
+        </>
+      )}
+    </>
+  );
+}
+
+// What each model costs, and a search. Models are priced per million tokens,
+// so that's how they're listed; in the app you only ever see credits.
+function ModelRates() {
+  return (
+    <>
+      <p>
+        Model by model, that comes to the prices below, per million tokens (a token is about three-quarters of a word).
+        In the app you only ever see credits.
+      </p>
+      <table className="doc-table">
+        <thead>
+          <tr>
+            <th>model</th>
+            <th>what you type and the chat so far</th>
+            <th>the reply</th>
+          </tr>
+        </thead>
+        <tbody>
+          {config.models
+            .filter((m) => !("retired" in m && m.retired))
+            .map((m) => (
+              <tr key={m.id}>
+                <td>{m.label}</td>
+                <td>{perMillion(m.credit_per_million_prompt_tokens)}</td>
+                <td>{perMillion(m.credit_per_million_completion_tokens)}</td>
+              </tr>
+            ))}
+        </tbody>
+      </table>
+      <p>
+        When the model searches the web on your behalf, each search is {config.tools.web_search.credits} credits (Brave
+        Search charges us ${config.tools.web_search.cost_usd.toFixed(3)}, doubled the same way). Reading a web page
+        costs nothing extra. Both show as steps above the reply, so you can see what it looked up.
+      </p>
+    </>
+  );
+}
 
 export function HomePage({ models, selectedModel, onSelectModel, onSend, onSignIn, onRequestInvite }: Props) {
   const placeholder = useMemo(randomEmptyLine, []);
@@ -196,24 +267,10 @@ export function HomePage({ models, selectedModel, onSelectModel, onSend, onSignI
         </a>
       </section>
       <section className="home-marketing">
-        {SECTIONS.map((s) => (
+        {HOME_SECTIONS.map((s) => (
           <div className="marketing-section" id={s.id} key={s.id}>
             <h2>{s.title}</h2>
-            {s.paragraphs.map((p, i) => (
-              <p key={i}>
-                {p.lead && <strong>{p.lead} </strong>}
-                {p.text}
-                {p.source && (
-                  <>
-                    {" "}
-                    <a className="marketing-source" href={p.source.href} target="_blank" rel="noopener">
-                      Source: {p.source.label}
-                    </a>
-                  </>
-                )}
-              </p>
-            ))}
-            {s.id === "what-it-costs-us" && <WhereItGoes />}
+            <HomeSectionBody section={s} />
           </div>
         ))}
       </section>

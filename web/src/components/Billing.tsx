@@ -50,17 +50,18 @@ function History({ rows }: { rows: BillingData["history"] }) {
         </ol>
       )}
       <p className="billing-panel-note">
-        Receipts are on Stripe's page, linked above once you've bought something. <a href="/pricing">Where the money goes</a>.
+        Receipts are on Stripe's page, linked above once you've bought something. <a href="/welcome#what-it-costs-us">Where the money goes</a>.
       </p>
     </section>
   );
 }
 
-// /billing (and /usage, until Phase 4 gives that its own page): the balance,
-// what's for sale, the subscription, and the account's purchase history
-// (where the money goes is on the public home page). Paying happens
-// on Stripe's site; the buttons here only send the browser there and back.
-export function Billing({ me }: Props) {
+// The Credits page under Settings (/settings/credits): the balance, what's
+// for sale, the subscription, and the account's purchase history (where the
+// money goes is on the public home page). Paying happens on Stripe's site;
+// the buttons here only send the browser there and back. The section ids
+// are what the Settings nav lists.
+export function BillingPanel({ me }: Props) {
   const [data, setData] = useState<BillingData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -95,21 +96,13 @@ export function Billing({ me }: Props) {
   }
 
   return (
-    <div className="admin billing">
-      <header className="admin-header">
-        <a href="/" className="admin-back">
-          ← Lechuga
-        </a>
-        <h1>Credits</h1>
-        <span className="admin-who">{me.username ?? me.email}</span>
-      </header>
-
+    <div className="billing">
       {justPaid && <p className="billing-note ok">Thank you. Your credits will show up here in a few seconds.</p>}
       {error && <p className="billing-note bad">{error}</p>}
 
       {data && (
         <>
-          <section className="billing-panel billing-balance">
+          <section id="balance" className="billing-panel billing-balance">
             <div className="billing-balance-label">Your balance</div>
             <div className="billing-balance-number">
               {data.balance.toLocaleString()} <span>credits</span>
@@ -126,7 +119,7 @@ export function Billing({ me }: Props) {
             </p>
           ) : (
             <>
-              <h2 className="billing-heading">Pay once</h2>
+              <h2 id="buy" className="billing-heading">Pay once</h2>
               <div className="billing-cards">
                 {data.packs.map((p) => (
                   <div key={p.id} className="billing-card">
@@ -188,8 +181,12 @@ export function Billing({ me }: Props) {
             </>
           )}
 
-          <History rows={data.history} />
-          <DeleteAccount email={me.email} />
+          <div id="purchases">
+            <History rows={data.history} />
+          </div>
+          <div id="account">
+            <DeleteAccount email={me.email} />
+          </div>
         </>
       )}
     </div>

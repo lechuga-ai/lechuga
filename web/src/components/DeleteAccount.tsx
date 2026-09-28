@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { authClient } from "../auth";
 
-// At the foot of /billing: a quiet link, and the dialog that makes sure. It
+// At the foot of /settings/credits: a quiet link, and the dialog that makes sure. It
 // lives here, not in the menu behind your name, so it's never one slip away
 // from Sign out.
 export function DeleteAccount({ email }: { email: string }) {

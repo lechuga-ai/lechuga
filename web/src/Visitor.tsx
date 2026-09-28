@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import { SignInCard, SignInScreen } from "./components/SignIn";
 import { Legal } from "./components/Legal";
 import { HomePage } from "./routes/HomePage";
-import { AboutPage, PricingPage, WhatsNewPage } from "./routes/StaticPages";
+import { WhatsNewPage } from "./routes/StaticPages";
 import { HelpPage } from "./routes/HelpPage";
-import { TipsPage } from "./routes/TipsPage";
+import { GettingStartedPage } from "./routes/GettingStartedPage";
+import { WelcomePage } from "./routes/WelcomePage";
 import { TrialPage } from "./routes/TrialPage";
 import { readTrial, saveDraft, setTrialMessage } from "./startMessage";
 import { listModels, type Model } from "./api";
@@ -67,11 +68,13 @@ export function Visitor() {
           element={<TrialPage models={models} onSignIn={() => setOverlay("signin")} onRequestInvite={() => setOverlay("request")} />}
         />
         <Route path="/invite/:token" element={<InviteRoute />} />
-        <Route path="/about" element={<AboutPage />} />
+        <Route path="/about" element={<Navigate to="/welcome#who-we-are" replace />} />
         <Route path="/whats-new" element={<WhatsNewPage />} />
-        <Route path="/pricing" element={<PricingPage />} />
+        <Route path="/pricing" element={<Navigate to="/welcome#what-it-costs" replace />} />
         <Route path="/help" element={<HelpPage />} />
-        <Route path="/tips" element={<TipsPage />} />
+        <Route path="/help/getting-started" element={<GettingStartedPage />} />
+        <Route path="/tips" element={<Navigate to="/help/getting-started" replace />} />
+        <Route path="/welcome" element={<WelcomePage />} />
         <Route path="/terms" element={<Legal page="terms" />} />
         <Route path="/privacy" element={<Legal page="privacy" />} />
         {/* A chat, /billing, /admin...: sign in, then land where you were going. */}

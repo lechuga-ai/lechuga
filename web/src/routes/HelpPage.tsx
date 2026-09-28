@@ -3,16 +3,23 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { getAuthConfig, sendFeedback, type Me } from "../api";
 import { NoteDialog } from "../components/NoteDialog";
-import { SiteFooter } from "../components/SiteFooter";
+import { SideNavPage } from "../components/SideNavPage";
+import { HELP_NAV } from "./GettingStartedPage";
 
 const FAQS: { q: string; a: ReactNode }[] = [
   {
     q: "Is Lechuga free?",
-    a: "The home page's one free chat a day needs no account. Beyond that you buy credits or subscribe; see \"Pricing transparency\" for the breakdown.",
+    a: (
+      <>
+        The home page's one free chat a day needs no account. Beyond that you buy credits or subscribe;{" "}
+        <Link to="/welcome#what-it-costs">What it costs</Link> has the numbers, and the section after it shows where the
+        money goes.
+      </>
+    ),
   },
   {
     q: "Which model should I use?",
-    a: "GLM 5.3 Flash, the default, is right for nearly everything. The composer has a \"which model?\" guide that compares them.",
+    a: "GLM 5.3 Flash, the default, is right for nearly everything. The ? beside the model's name, under the box you type in, explains each one and what effort means.",
   },
   {
     q: "Do my chats train the models?",
@@ -33,8 +40,8 @@ const FAQS: { q: string; a: ReactNode }[] = [
   },
 ];
 
-// /help: FAQs, a short how-to, and a way to reach us. Reachable signed in or
-// out. Signed out, that's the public Turnstile-checked feedback form (see
+// /help: FAQs, a short how-to, and a way to reach us, with Getting started
+// with AI as the other page in its nav. Reachable signed in or out. Signed out, that's the public Turnstile-checked feedback form (see
 // worker/src/requests.ts); signed in, it's "Send us a note" (NoteDialog),
 // tied to the account and without a captcha. `me` comes from Root, which
 // already has it loaded before routing here; Visitor leaves it unset.
@@ -43,22 +50,15 @@ type Props = { me?: Me };
 export function HelpPage({ me }: Props) {
   const [noteOpen, setNoteOpen] = useState(false);
   return (
-    <div className="doc-page">
-      <div className="doc-inner">
-        <Link className="doc-brand" to="/">
-          <span className="logo">
-            <img src="/lechuga_logo.png" alt="" />
-          </span>
-          Lechuga
-        </Link>
-        <h1>Help</h1>
+    <SideNavPage title="Help" nav={HELP_NAV}>
+      <p>
+        New to chat models, or want to get more out of this one?{" "}
+        <Link to="/help/getting-started">Getting started with AI</Link> covers how they work, where they go wrong, what
+        not to type in, and how to spend fewer credits.
+      </p>
 
-        <p>
-          New to chat models, or want to get more out of this one? <Link to="/tips">Tips + tricks</Link> covers how they
-          work, where they go wrong, what not to type in, and how to spend fewer credits.
-        </p>
-
-        <h2 className="help-section-title">FAQs</h2>
+      <section id="questions" className="help-section">
+        <h2 className="help-section-title">Questions</h2>
         <dl className="help-faq">
           {FAQS.map(({ q, a }) => (
             <div key={q}>
@@ -67,21 +67,27 @@ export function HelpPage({ me }: Props) {
             </div>
           ))}
         </dl>
+      </section>
 
+      <section id="how-to" className="help-section">
         <h2 className="help-section-title">How to use it</h2>
         <ol className="help-steps">
           <li>Type in the box and send. That's the whole interface.</li>
           <li>Your past chats are on the left; click one to go back to it, or start a new one any time.</li>
           <li>Drag a file onto the page (a PDF, a document, a spreadsheet, code, or a picture if you're on GLM 5.3 Flash), or paste in something long, and it becomes a card attached to your message.</li>
-          <li>Next to the model is how hard it should think. Low is quick and cheap; high is slower and better on hard problems.</li>
+          <li>Next to the model is how hard it should think. Low is quick and cheap; high is slower and better on hard problems. The ? beside them explains both.</li>
           <li>Pick a model under the box before you start a chat. A chat keeps the model it started with.</li>
-          <li>Your credit balance is in the sidebar. To buy more or manage a subscription, choose More credits from the menu behind your name.</li>
+          <li>The box above your chats searches them: type a word or two and the list shows the chats that mention them.</li>
+          <li>Your credit balance is in the sidebar. To buy more or manage a subscription, choose Account from the menu behind your name, then Credits.</li>
+          <li>Your name and photo are under Account too. <Link to="/welcome">About Lechuga</Link>, in the list on the left, is what this is and who made it.</li>
           <li>Invite a friend from the menu behind your name.</li>
           <li>
-            Delete your account at the foot of the <a href="/billing">credits page</a>.
+            Delete your account at the foot of the <Link to="/settings/credits">credits page</Link>.
           </li>
         </ol>
+      </section>
 
+      <section id="feedback" className="help-section">
         <h2 className="help-section-title">Feedback</h2>
         <p>Something wrong, confusing, or worth telling us? This goes straight to us, not a form that vanishes.</p>
         {me ? (
@@ -94,9 +100,8 @@ export function HelpPage({ me }: Props) {
         ) : (
           <FeedbackForm />
         )}
-      </div>
-      <SiteFooter />
-    </div>
+      </section>
+    </SideNavPage>
   );
 }
 

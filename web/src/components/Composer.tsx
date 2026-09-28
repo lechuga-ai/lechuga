@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { convertFile, type Model } from "../api";
 import { CONVERTIBLE, looksLikeText, type Attachment } from "../../../worker/src/attachments";
 import config from "../../../worker/config.json";
 
 import { getEffort, saveEffort, type Effort } from "../effort";
+import { ModelHelp } from "./ModelHelp";
 
 const LIMITS = config.limits;
 
@@ -61,8 +62,8 @@ export function Composer({
   // The latest list, for the drop handler, which is registered once.
   const attachmentsRef = useRef(attachments);
   attachmentsRef.current = attachments;
-  const [guideOpen, setGuideOpen] = useState(false);
-  const guideRef = useRef<HTMLDivElement>(null);
+  // The "?" beside the model: what the models and effort are (ModelHelp).
+  const [helpOpen, setHelpOpen] = useState(false);
   // Remembered in this browser, and sent with each message by api.ts.
   const [effort, setEffort] = useState<Effort>(getEffort);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -71,33 +72,6 @@ export function Composer({
   useEffect(() => {
     if (focusSignal !== undefined && focusSignal > 0) textareaRef.current?.focus();
   }, [focusSignal]);
-
-  // Ways out of the model guide, for anyone who doesn't know that clicking
-  // away is one: a click anywhere outside it, and Escape. There's an ✕ in
-  // the panel itself too. KeyboardEvent here is the browser's, not React's
-  // same-named type, which this file imports.
-  useEffect(() => {
-    if (!guideOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (guideRef.current && !guideRef.current.contains(e.target as Node)) setGuideOpen(false);
-    };
-    const handleKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") setGuideOpen(false);
-    };
-    window.addEventListener("mousedown", handleClick);
-    window.addEventListener("keydown", handleKey);
-    return () => {
-      window.removeEventListener("mousedown", handleClick);
-      window.removeEventListener("keydown", handleKey);
-    };
-  }, [guideOpen]);
-
-  // Picking a model, from the box's own menu or from the guide panel, is
-  // the same action either way, and both close the guide once it's done.
-  function selectModel(id: string) {
-    onSelectModel(id);
-    setGuideOpen(false);
-  }
 
   // Adds what fits and says why about what doesn't. The worker checks the
   // same limits again (chat.ts); these are here so the answer is immediate.
@@ -304,6 +278,17 @@ export function Composer({
               {leading}
             </div>
           )}
+          {/* Just left of the model's name, so the first question anyone has
+              ("what are these?") is answered where it's asked. */}
+          {models.length > 0 && (
+            <button type="button" className="model-help-btn" onClick={() => setHelpOpen(true)} aria-label="About the models and effort" title="What are these?">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.75" stroke="currentColor" strokeWidth="1.2" />
+                <path d="M6.1 6.3a1.9 1.9 0 1 1 2.7 1.7c-.5.25-.8.6-.8 1.1v.3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <circle cx="8" cy="11.4" r=".75" fill="currentColor" />
+              </svg>
+            </button>
+          )}
           {/* Where the model can't change — an open chat, and the home page's
               free chat — it says which one and stops there. As a menu it had
               to carry a whole sentence explaining itself, and a select is as
@@ -314,12 +299,12 @@ export function Composer({
                 {model?.label ?? selectedModel}
               </span>
             ) : (
-              <select
-                className="model-select"
+              <PillSelect
+                label={model?.label ?? selectedModel}
                 value={selectedModel}
                 title="Model for new chats"
-                onChange={(e) => selectModel(e.target.value)}
-                aria-label="Model"
+                ariaLabel="Model"
+                onChange={onSelectModel}
               >
                 {models
                   // Retired models only appear when this chat is already on one.
@@ -329,27 +314,27 @@ export function Composer({
                       {m.label}
                     </option>
                   ))}
-              </select>
+              </PillSelect>
             ))}
           {/* Beside the model, and independent of it. Not on the public home
               page, whose free chat has no settings. */}
           {!sendLabel && (
-            <select
-              className="model-select"
+            <PillSelect
+              label={config.efforts.find((e) => e.id === effort)?.label ?? effort}
               value={effort}
               title={config.efforts.find((e) => e.id === effort)?.hint}
-              onChange={(e) => {
-                setEffort(e.target.value as Effort);
-                saveEffort(e.target.value as Effort);
+              ariaLabel="How hard the model thinks before answering"
+              onChange={(v) => {
+                setEffort(v as Effort);
+                saveEffort(v as Effort);
               }}
-              aria-label="How hard the model thinks before answering"
             >
               {config.efforts.map((e) => (
                 <option key={e.id} value={e.id} title={e.hint}>
                   {e.label}
                 </option>
               ))}
-            </select>
+            </PillSelect>
           )}
           {streaming ? (
             <button className="send-btn stop" onClick={onStop} aria-label="Stop">
@@ -369,19 +354,35 @@ export function Composer({
         </div>
       </div>
       {dragging && createPortal(<DropMask />, document.body)}
-      {/* Not on the public home page (sendLabel), where the model is fixed. */}
-      {!sendLabel && models.length > 1 && (
-        <ModelGuide
-          containerRef={guideRef}
-          open={guideOpen}
-          onToggle={() => setGuideOpen((v) => !v)}
-          models={models.filter((m) => !m.retired || m.id === selectedModel)}
-          selectedModel={selectedModel}
-          locked={modelLocked}
-          onSelect={selectModel}
-        />
-      )}
+      {helpOpen && createPortal(<ModelHelp models={models} selectedModel={selectedModel} onClose={() => setHelpOpen(false)} />, document.body)}
     </div>
+  );
+}
+
+type PillProps = {
+  label: string;
+  value: string;
+  title?: string;
+  ariaLabel: string;
+  onChange: (value: string) => void;
+  children: ReactNode;
+};
+
+// A menu that looks like a small button: the chosen name and a caret right
+// beside it. A bare <select> is as wide as its longest option, which left the
+// caret stranded far from a short name. The real select lies invisibly over
+// the pill, so clicks, keyboard and screen readers all reach it.
+function PillSelect({ label, value, title, ariaLabel, onChange, children }: PillProps) {
+  return (
+    <span className="pill-select" title={title}>
+      <span className="pill-select-label">{label}</span>
+      <svg className="pill-select-caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+        <path d="M2 3.5l3 3 3-3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      </svg>
+      <select value={value} onChange={(e) => onChange(e.target.value)} aria-label={ariaLabel}>
+        {children}
+      </select>
+    </span>
   );
 }
 
@@ -495,72 +496,6 @@ function DropMask() {
           Up to {LIMITS.attachments_per_message} files and about {Math.round(LIMITS.attachment_chars / 3000)} pages of text
           in all, and {LIMITS.images_per_message} pictures. Not yet: scanned PDFs, slides, audio or video.
         </p>
-      </div>
-    </div>
-  );
-}
-
-type GuideProps = {
-  containerRef: RefObject<HTMLDivElement>;
-  open: boolean;
-  onToggle: () => void;
-  models: Model[];
-  selectedModel: string;
-  locked: boolean;
-  onSelect: (id: string) => void;
-};
-
-// Unfolds under the box, in place: each model, what it costs next to the
-// default, and what we honestly think it's for. Choosing here is the same as
-// choosing in the picker; in an open chat it only informs.
-function ModelGuide({ containerRef, open, onToggle, models, selectedModel, locked, onSelect }: GuideProps) {
-  const base = models[0];
-  return (
-    <div className="model-guide" ref={containerRef}>
-      <button type="button" className="model-guide-toggle" onClick={onToggle} aria-expanded={open}>
-        about the models <span aria-hidden="true">{open ? "▴" : "▾"}</span>
-      </button>
-      {/* Always in the DOM (so the open/close transition can play) but
-          absolutely positioned, so opening it never changes the composer's
-          height and shoves the chat above it around. */}
-      <div className={`model-guide-panel ${open ? "open" : ""}`} aria-hidden={!open}>
-        {open && (
-          <button type="button" className="model-guide-close" onClick={onToggle} aria-label="Close">
-            ✕
-          </button>
-        )}
-        {open && (
-          <p className="model-guide-intro">
-            {locked
-              ? "For your information. This chat stays on the model it started with."
-              : "For your information. You can pick one here, or in the menu in the box above: it's the same choice."}
-          </p>
-        )}
-        {open &&
-          models.map((m) => {
-            // Replies are most of any bill, so compare on the output rate.
-            const times = Math.round(m.credit_per_million_completion_tokens / base.credit_per_million_completion_tokens);
-            return (
-              <button
-                key={m.id}
-                type="button"
-                className={`model-guide-row ${m.id === selectedModel ? "selected" : ""}`}
-                onClick={() => !locked && onSelect(m.id)}
-                disabled={locked && m.id !== selectedModel}
-              >
-                <span className="model-guide-name">
-                  {m.label}
-                  <span className="model-guide-cost">{m.id === base.id ? "our default" : `about ${times}× the cost`}</span>
-                </span>
-                {m.blurb && <span className="model-guide-blurb">{m.blurb}</span>}
-              </button>
-            );
-          })}
-        {open && (
-          <p className="model-guide-foot">
-            Exact prices are on the <a href="/pricing">pricing page</a>, and there's more on choosing in <a href="/tips">Tips + tricks</a>.
-          </p>
-        )}
       </div>
     </div>
   );

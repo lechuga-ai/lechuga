@@ -1,29 +1,10 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
-import { SiteFooter } from "../components/SiteFooter";
-import { WhereItGoes } from "../components/WhereItGoes";
-import config from "../../../worker/config.json";
+import { SideNavPage } from "../components/SideNavPage";
+import { HELP_NAV } from "./GettingStartedPage";
 
 // /terms and /privacy are components/Legal.tsx: those are the texts people
-// accept on the username step, so there is one copy of each. Every static
-// page gets the full trust footer.
-export function DocPage({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="doc-page">
-      <div className="doc-inner">
-        <Link className="doc-brand" to="/">
-          <span className="logo">
-            <img src="/lechuga_logo.png" alt="" />
-          </span>
-          Lechuga
-        </Link>
-        <h1>{title}</h1>
-        {children}
-      </div>
-      <SiteFooter />
-    </div>
-  );
-}
+// accept on the username step, so there is one copy of each. Every page here
+// sits in the public set's nav (HELP_NAV, routes/GettingStartedPage.tsx).
 
 type TeamMemberProps = { name: string; photo: string; linkedin: string; facts: { label: string; value: ReactNode }[] };
 
@@ -48,31 +29,10 @@ function TeamMember({ name, photo, linkedin, facts }: TeamMemberProps) {
   );
 }
 
-export function AboutPage() {
+// The two of us, with a way to say hi. Under "Who we are" on /welcome.
+export function AboutTeam() {
   return (
-    <DocPage title="About Lechuga">
-      <p>
-        Lechuga is a chat assistant that runs open source AI models — currently GLM 5.3 Flash and GLM 5.3 from Z.ai,
-        and DeepSeek V4 Flash — on Cloudflare's infrastructure, at a fraction of what the big labs charge.
-      </p>
-      <p>
-        We started this because we wanted somewhere to send our friends. Open source models turned out to be
-        surprisingly good — good enough for nearly everything people actually use a chat assistant for — and we
-        didn't see why using one well should mean running your own server or reading pages of documentation first. So
-        we built the easy version: sign in, type, get an answer, and pay only what it costs.
-      </p>
-      <p>
-        That openness is also why we think this is fairer, not just cheaper. When you can see exactly what a reply
-        costs to run and what we charge on top of it, nobody's guessing whether they're getting a fair deal. It tends
-        to be lighter on the planet too: we run smaller, efficient open-weight models instead of the biggest frontier
-        ones, and that means less compute behind every reply.
-      </p>
-      <p>
-        It's a side project, run by people who like what these models can do and dislike most of what the AI business
-        has become. There's no venture funding, no growth target, and no plan to sell your attention or your data.
-      </p>
-
-      <h2 className="about-section-title">Who we are</h2>
+    <>
       <div className="about-team">
         <TeamMember
           name="Cynthia Johanson"
@@ -99,8 +59,8 @@ export function AboutPage() {
             {
               label: "Favorite podcast",
               value: (
-                <a href="https://www.acquired.fm" target="_blank" rel="noopener">
-                  Acquired
+                <a href="https://podcasts.apple.com/us/podcast/letters-from-an-american/id1730358737" target="_blank" rel="noopener">
+                  Letters from an American
                 </a>
               ),
             },
@@ -113,55 +73,7 @@ export function AboutPage() {
       <p>
         Say hi: <a href="mailto:hello@lechuga.ai">hello@lechuga.ai</a>.
       </p>
-    </DocPage>
-  );
-}
-
-const perMillion = (credits: number) => `$${(credits / 10000).toFixed(2)}`;
-
-// /pricing: what it costs and where the money goes, for anyone, signed in or
-// not (the home page says the same, but only signed-out visitors see it).
-export function PricingPage() {
-  const packs = config.credit_packs;
-  return (
-    <DocPage title="Pricing, and where the money goes">
-      <p>
-        {packs.map((p) => `$${p.usd} buys ${p.credits.toLocaleString()} credits`).join(". ")}. Or ${config.subscription.usd} a
-        month adds {config.subscription.credits.toLocaleString()} credits each month, and unused ones roll over. Credits
-        never expire. 10,000 credits is $1 of use, and every reply shows what it cost.
-      </p>
-      <p>
-        We charge {config.costs.markup === 2 ? "twice" : `${config.costs.markup} times`} what Cloudflare charges us to run
-        each model, and that's the whole pricing model. Models are priced per million tokens (a token is about three-quarters
-        of a word), so that's how we list them here; in the app you only ever see credits.
-      </p>
-      <table className="doc-table">
-        <thead>
-          <tr>
-            <th>model</th>
-            <th>what you type and the chat so far</th>
-            <th>the reply</th>
-          </tr>
-        </thead>
-        <tbody>
-          {config.models
-            .filter((m) => !("retired" in m && m.retired))
-            .map((m) => (
-              <tr key={m.id}>
-                <td>{m.label}</td>
-                <td>{perMillion(m.credit_per_million_prompt_tokens)}</td>
-                <td>{perMillion(m.credit_per_million_completion_tokens)}</td>
-              </tr>
-            ))}
-        </tbody>
-      </table>
-      <p>
-        When the model searches the web on your behalf, each search is {config.tools.web_search.credits} credits (Brave
-        Search charges us ${config.tools.web_search.cost_usd.toFixed(3)}, and the same doubling applies). Reading a web
-        page costs nothing extra. Both show as steps above the reply, so you can see what it looked up.
-      </p>
-      <WhereItGoes />
-    </DocPage>
+    </>
   );
 }
 
@@ -171,6 +83,34 @@ export function PricingPage() {
 type NewsEntry = { date: string; title: string; intro: string; items: { lead: string; text: string }[] };
 
 const NEWS: NewsEntry[] = [
+  {
+    date: "September 28, 2026",
+    title: "Easier to find your way around",
+    intro:
+      "A handful of changes for anyone new here, and for anyone who has ever lost a chat. Nothing about the models or prices has changed.",
+    items: [
+      {
+        lead: "Search your chats.",
+        text: "A box above the list on the left. Type a word or two and the list becomes the chats that mention them, each with the line where the words appear. Clear it and everything is back.",
+      },
+      {
+        lead: "A ? beside the model.",
+        text: "The line under the box that unfolded a guide to the models is gone. In its place, a small ? next to the model's name opens a plain explanation of what the models are, what each is for, and what low, medium and high effort actually change about an answer and its price.",
+      },
+      {
+        lead: "Help, with a table of contents.",
+        text: "The help pages have a list of their sections down the left that follows you as you read. Tips + tricks is now called Getting started with AI and lives there too.",
+      },
+      {
+        lead: "Account.",
+        text: "Profile has become Account, a page of its own in the menu behind your name: your name and photo on one side, credits and billing on the other.",
+      },
+      {
+        lead: "About Lechuga, from inside.",
+        text: "Everything the home page says to people who aren't signed in, plus who we are, now sits beside the help pages as About Lechuga, so you can read it after signing in.",
+      },
+    ],
+  },
   {
     date: "September 22, 2026",
     title: "It can look things up",
@@ -364,7 +304,7 @@ const NEWS: NewsEntry[] = [
 
 export function WhatsNewPage() {
   return (
-    <DocPage title="What's new">
+    <SideNavPage title="What's new" nav={HELP_NAV}>
       {NEWS.map((entry) => (
         <section key={entry.date} className="news-entry">
           <p className="news-date">{entry.date}</p>
@@ -379,6 +319,6 @@ export function WhatsNewPage() {
           </ul>
         </section>
       ))}
-    </DocPage>
+    </SideNavPage>
   );
 }

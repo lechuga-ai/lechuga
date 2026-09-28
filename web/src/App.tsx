@@ -9,14 +9,12 @@ import { createChat, deleteChat, getMe, listChats, listModels, removeChatMember,
 
 type Props = {
   me: Me;
-  // After a profile change, so the new name and face show everywhere.
-  onMeChange: (me: Me) => void;
   onSignOut: () => Promise<void>;
 };
 
 // The signed-in app: the sidebar around two routes, "/" (a fresh chat) and
 // /c/<id>. Root only renders this with a session and a username.
-export default function App({ me, onMeChange, onSignOut }: Props) {
+export default function App({ me, onSignOut }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const [chats, setChats] = useState<Chat[]>([]);
@@ -140,7 +138,6 @@ export default function App({ me, onMeChange, onSignOut }: Props) {
         onNewChat={handleNewChat}
         onDelete={handleDelete}
         me={me}
-        onMeChange={onMeChange}
         balance={balance}
         onSignOut={onSignOut}
       />

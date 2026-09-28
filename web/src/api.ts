@@ -117,6 +117,15 @@ export async function listChats(): Promise<Chat[]> {
   return expectJson(await fetch("/api/chats"));
 }
 
+// Chats whose title or messages contain every word of q. snippet is the
+// first matching message, trimmed around the first word; null when only the
+// title matched.
+export type ChatHit = Chat & { snippet: string | null };
+
+export async function searchChats(q: string): Promise<ChatHit[]> {
+  return expectJson(await fetch(`/api/chats/search?q=${encodeURIComponent(q)}`));
+}
+
 export async function createChat(model?: string): Promise<{ id: string }> {
   return expectJson(
     await fetch("/api/chats", {

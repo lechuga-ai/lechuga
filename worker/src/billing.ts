@@ -85,8 +85,8 @@ billing.post("/checkout", async (c) => {
       customer: await customerFor(c, row),
       client_reference_id: c.get("userId"),
       line_items: [{ price: await priceIdFor(c.env, meta.pack), quantity: 1 }],
-      success_url: `${c.env.BASE_URL}/billing?checkout=success`,
-      cancel_url: `${c.env.BASE_URL}/billing`,
+      success_url: `${c.env.BASE_URL}/settings/credits?checkout=success`,
+      cancel_url: `${c.env.BASE_URL}/settings/credits`,
       metadata: meta,
       // Managed Payments: Stripe is the seller of record and handles sales
       // tax and VAT, for an extra fee. Stripe refuses the checkout unless the
@@ -112,7 +112,7 @@ billing.post("/portal", async (c) => {
   try {
     const session = await stripe<{ url: string }>(c.env, "POST", "/billing_portal/sessions", {
       customer: row.stripe_customer_id,
-      return_url: `${c.env.BASE_URL}/billing`,
+      return_url: `${c.env.BASE_URL}/settings/credits`,
     });
     return c.json({ url: session.url });
   } catch (err) {
