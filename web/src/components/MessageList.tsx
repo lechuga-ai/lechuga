@@ -223,7 +223,7 @@ export function MessageList({ messages, streamingText, streamingReasoning, strea
               {m.errorCode === "out_of_credits" && (
                 <>
                   {" "}
-                  <a href="/billing">Get more credits</a>
+                  <a href="/settings/credits">Get more credits</a>
                 </>
               )}
             </div>

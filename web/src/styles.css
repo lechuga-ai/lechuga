@@ -214,6 +214,7 @@ button {
 
 .chat-list-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   padding: 8px 10px;
@@ -236,6 +237,51 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A search hit: where the words were, on a line of its own under the title. */
+.chat-snippet {
+  flex-basis: 100%;
+  order: 10;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #98a092;
+}
+
+.chat-list-item:hover .chat-snippet,
+.chat-list-item.active .chat-snippet {
+  color: #5f6659;
+}
+
+.chat-search {
+  width: 100%;
+  margin: -8px 0 10px;
+  padding: 7px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.55);
+  font: inherit;
+  font-size: 13px;
+  color: #1e221b;
+}
+
+.chat-search::placeholder {
+  color: #98a092;
+}
+
+.chat-search:focus {
+  outline: none;
+  border-color: rgba(111, 174, 59, 0.6);
+  background: #fff;
+}
+
+.chat-list-empty {
+  margin: 6px 10px;
+  font-size: 13px;
+  color: #98a092;
 }
 
 .chat-age {
@@ -1049,26 +1095,43 @@ button {
   outline: none;
 }
 
-.model-select {
-  appearance: none;
-  -webkit-appearance: none;
-  background: transparent;
+/* The model and effort menus, as pills (PillSelect in Composer.tsx). The
+   select itself is stretched over the pill and made invisible; the pill is
+   what you see, and it fits the chosen name. */
+.pill-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px 5px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.03);
   color: var(--box-dim);
-  border: none;
-  border-radius: 8px;
-  padding: 6px 24px 6px 8px;
   font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M2 3.5l3 3 3-3' fill='none' stroke='%235f6659' stroke-width='1.3' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 8px center;
 }
 
-.model-select:hover,
-.model-select:focus {
+.pill-select:hover,
+.pill-select:focus-within {
   color: var(--box-text);
-  background-color: rgba(0, 0, 0, 0.05);
-  outline: none;
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.pill-select-caret {
+  flex-shrink: 0;
+}
+
+.pill-select select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .send-btn {
@@ -1262,8 +1325,20 @@ button {
   min-width: 0;
   height: 100%;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--public);
   color: var(--public-text);
+}
+
+/* On a page shorter than the window the footer still sits at the bottom. */
+.doc-page > .site-footer {
+  margin-top: auto;
+}
+
+.doc-inner {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .doc-inner {
@@ -1398,19 +1473,6 @@ button {
   font-family: var(--sans);
   font-size: 16px;
   font-weight: 600;
-}
-
-.tips-contents {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  margin: 8px 0 8px;
-  padding: 14px 18px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.45);
-  font-family: var(--sans);
-  font-size: 14px;
 }
 
 .tips-section {
@@ -3188,140 +3250,6 @@ button {
 
 /* The model guide: a quiet line under the box that unfolds in place. */
 
-.model-guide {
-  position: relative;
-  margin-top: 8px;
-  text-align: center;
-}
-
-.model-guide-toggle {
-  padding: 2px 8px;
-  border: none;
-  background: none;
-  font-size: 12.5px;
-  color: var(--text-faint);
-}
-
-.model-guide-toggle:hover {
-  color: var(--text-dim);
-}
-
-/* Floats over the tail of the messages above the composer, instead of
-   pushing the composer down (there's no room below it: .chat-view clips at
-   its own bottom edge). Slides up into place so it still reads as
-   "unfolding", without moving the composer box itself. */
-.model-guide-panel {
-  position: absolute;
-  bottom: 100%;
-  left: 0;
-  right: 0;
-  margin-bottom: 8px;
-  padding: 6px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--box);
-  color: var(--box-text);
-  text-align: left;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  z-index: 5;
-  opacity: 0;
-  transform: translateY(6px);
-  pointer-events: none;
-  transition: opacity 0.16s ease, transform 0.16s ease;
-}
-
-.model-guide-panel.open {
-  opacity: 1;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-.model-guide-row {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  background: none;
-  color: inherit;
-  text-align: left;
-}
-
-.model-guide-row:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.model-guide-row.selected {
-  border-color: rgba(111, 174, 59, 0.55);
-  background: rgba(111, 174, 59, 0.08);
-}
-
-.model-guide-row:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
-
-.model-guide-name {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.model-guide-cost {
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--box-dim);
-  white-space: nowrap;
-}
-
-.model-guide-blurb {
-  font-size: 13.5px;
-  line-height: 1.5;
-  color: var(--box-dim);
-}
-
-.model-guide-rate {
-  font-size: 12px;
-  color: var(--box-faint);
-  font-variant-numeric: tabular-nums;
-}
-
-.model-guide-intro {
-  /* Room on the right for the ✕. */
-  margin: 8px 30px 6px 12px;
-  font-size: 12.5px;
-  color: var(--box-dim);
-}
-
-/* A way out that doesn't depend on knowing you can click away. Escape works
-   too (Composer), and so does picking a model. */
-.model-guide-close {
-  position: absolute;
-  top: 7px;
-  right: 9px;
-  padding: 4px 6px;
-  border: none;
-  border-radius: 8px;
-  background: none;
-  color: var(--box-faint);
-  font-size: 12px;
-  line-height: 1;
-}
-
-.model-guide-close:hover {
-  color: var(--box-text);
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.model-guide-foot a {
-  color: var(--public-green);
-}
-
 .chat-notice-action {
   padding: 0;
   border: none;
@@ -3387,18 +3315,6 @@ button {
   font-size: 15px;
   line-height: 1.55;
   color: var(--text);
-}
-
-.model-guide-foot {
-  margin: 6px 12px 8px;
-  font-size: 12.5px;
-  color: var(--box-faint);
-}
-
-/* Over the photo the toggle needs the hero's legibility. */
-.home-hero .model-guide-toggle {
-  color: rgba(253, 252, 248, 0.8);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 /* Faces: profile photos, or an initial on a colour. Used in the sidebar, the
@@ -3861,5 +3777,279 @@ button {
 @media (max-width: 700px) {
   .dash-split {
     grid-template-columns: 1fr;
+  }
+}
+
+/* The "?" beside the model's name (Composer), and what it opens (ModelHelp). */
+
+/* Quiet on purpose: a small "?" beside the model's name, not a button
+   competing with the pickers. It's still a real button underneath, for
+   focus and screen readers. */
+.model-help-btn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  padding: 3px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--box-faint);
+  line-height: 0;
+  cursor: pointer;
+}
+
+.model-help-btn:hover,
+.model-help-btn:focus-visible {
+  color: var(--box-text);
+  outline: none;
+}
+
+.modal.wide {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 7px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--box-faint);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--box-text);
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.model-help h2 {
+  margin-right: 28px;
+}
+
+.model-help h3 {
+  margin: 18px 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.model-help p {
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.model-help-list {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+}
+
+.model-help-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.model-help-list li + li {
+  margin-top: 6px;
+}
+
+.model-help-list li.selected {
+  border-color: rgba(111, 174, 59, 0.55);
+  background: rgba(111, 174, 59, 0.08);
+}
+
+.model-help-name {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.model-help-cost {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--box-dim);
+  white-space: nowrap;
+}
+
+.model-help-blurb {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--box-dim);
+}
+
+.model-help-foot {
+  margin-bottom: 0;
+}
+
+.model-help-foot a {
+  color: var(--public-green);
+}
+
+/* Pages with a table of contents down the left (SideNavPage): Help, Getting
+   started with AI, Settings, About Lechuga. The doc page's column widens to
+   fit the nav beside the text; the text keeps the doc page's measure. */
+
+.doc-inner.docnav {
+  max-width: 960px;
+}
+
+.docnav-body {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 640px);
+  gap: 48px;
+  align-items: start;
+}
+
+.docnav-nav {
+  position: sticky;
+  top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: var(--sans);
+  font-size: 14px;
+}
+
+.docnav-group > a {
+  display: block;
+  padding: 4px 0;
+  color: var(--public-dim);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.docnav-group > a:hover {
+  color: var(--public-text);
+}
+
+.docnav-group.current > a {
+  color: var(--public-text);
+  font-weight: 600;
+}
+
+.docnav-sections {
+  display: flex;
+  flex-direction: column;
+  margin: 2px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.docnav-sections a {
+  display: block;
+  margin-left: -12px;
+  padding: 4px 0 4px 10px;
+  border-left: 2px solid transparent;
+  color: var(--public-dim);
+  text-decoration: none;
+  font-size: 13.5px;
+  line-height: 1.35;
+}
+
+.docnav-sections a:hover {
+  color: var(--public-text);
+}
+
+.docnav-sections a.active {
+  color: var(--public-green);
+  border-left-color: var(--public-green);
+}
+
+.docnav-content > h1 {
+  margin-top: 0;
+}
+
+.help-section {
+  scroll-margin-top: 24px;
+}
+
+.help-section:first-of-type .help-section-title {
+  margin-top: 8px;
+}
+
+/* Settings: the profile form in a white card, like the credits panels. */
+
+.settings-panel {
+  margin: 0;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  font-family: var(--sans);
+}
+
+.doc-inner .settings-panel p,
+.doc-inner .billing p {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--box-dim);
+}
+
+.settings-form label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--box-dim);
+}
+
+.settings-form input:not([type="file"]) {
+  width: 100%;
+  max-width: 360px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.settings-form input:focus {
+  outline: none;
+  border-color: rgba(111, 174, 59, 0.6);
+}
+
+.settings-form .modal-actions {
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.settings-saved {
+  font-size: 13px;
+  color: var(--public-green);
+}
+
+@media (max-width: 760px) {
+  .docnav-body {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .docnav-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  /* On a phone the section list would crowd the top of the page: the page
+     links alone, and the headings do the rest. */
+  .docnav-sections {
+    display: none;
   }
 }

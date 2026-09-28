@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import type { AppEnv, Env, ChatRow, MessageRow } from "./types";
 import { streamChat, collectText, type ChatTurn } from "./gateway";
 import { accountState, costUsdFor, creditsEnforced, creditsFor, estimateTokens, ledgerStatements } from "./credits";
-import { composeMessage, estimateMessageTokens, looksLikeImage, looksLikeText, modelContent, type Attachment, type ContentPart } from "./attachments";
+import { composeMessage, estimateMessageTokens, looksLikeImage, looksLikeText, modelContent, splitMessage, type Attachment, type ContentPart } from "./attachments";
 import { SUMMARY_PREAMBLE, SUMMARY_REQUEST, isSummary, sinceLastSummary, summaryText, wrapSummary } from "./summary";
 import { chatAccess, listChats, peopleByIds, roster } from "./sharing";
 import config from "../config.json";
@@ -74,6 +74,54 @@ export const chat = new Hono<AppEnv>();
 
 // Mine, and the ones shared with me (sharing.ts).
 chat.get("/chats", async (c) => c.json(await listChats(c.env, c.get("userId"))));
+
+// Keyword search over my chats: titles, and the messages inside them. Every
+// word has to appear somewhere in the same message (or the title), in any
+// order and any case. Before /chats/:id so "search" is never read as an id.
+//
+// The chats searched are exactly the ones listChats would return, expressed
+// as a subquery so no list of ids has to be bound (D1 caps bound values at
+// 100). A hit carries a snippet: the first matching message, cut to a
+// window around the first word, so the list can show why it matched.
+chat.get("/chats/search", async (c) => {
+  const q = (c.req.query("q") ?? "").trim().slice(0, 200).toLowerCase();
+  const words = q.split(/\s+/).filter(Boolean).slice(0, 6);
+  if (words.length === 0) return c.json([]);
+  const userId = c.get("userId");
+  const like = (w: string) => `%${w.replace(/[\\%_]/g, (ch) => "\\" + ch)}%`;
+  const clauses = words.map((_, i) => `lower(m.content) LIKE ?${i + 2} ESCAPE '\\'`).join(" AND ");
+  const { results: hits } = await c.env.DB.prepare(
+    `SELECT m.chat_id, m.content FROM messages m
+     WHERE m.chat_id IN (
+       SELECT id FROM chats WHERE user_id = ?1
+       UNION SELECT chat_id FROM chat_members WHERE user_id = ?1 AND removed_at IS NULL)
+     AND ${clauses}
+     ORDER BY m.created_at DESC LIMIT 300`
+  )
+    .bind(userId, ...words.map(like))
+    .all<{ chat_id: string; content: string }>();
+
+  const snippetOf = new Map<string, string>();
+  for (const h of hits) {
+    if (snippetOf.has(h.chat_id)) continue;
+    // Search the typed text, not the attachment blocks in front of it, when
+    // the typed text is where the match is.
+    const { typed } = splitMessage(h.content);
+    const source = words.every((w) => typed.toLowerCase().includes(w)) ? typed : h.content;
+    const flat = source.replace(/\s+/g, " ");
+    const at = flat.toLowerCase().indexOf(words[0]);
+    const start = Math.max(0, at - 40);
+    const cut = flat.slice(start, start + 120);
+    snippetOf.set(h.chat_id, (start > 0 ? "…" : "") + cut + (start + 120 < flat.length ? "…" : ""));
+  }
+
+  const mine = await listChats(c.env, userId);
+  const matches = mine
+    .filter((ch) => snippetOf.has(ch.id) || (ch.title && words.every((w) => ch.title!.toLowerCase().includes(w))))
+    .slice(0, 50)
+    .map((ch) => ({ ...ch, snippet: snippetOf.get(ch.id) ?? null }));
+  return c.json(matches);
+});
 
 chat.post("/chats", async (c) => {
   const body = await c.req.json().catch(() => ({}));

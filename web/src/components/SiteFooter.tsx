@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 const YEAR = new Date().getFullYear();
 
 // The full trust footer: brand + tagline, two columns of links, a copyright
-// line. Lives at the bottom of every public marketing/doc page (home, about,
-// terms, privacy, help, pricing, what's new). Signed-in app screens and the
+// line. Lives at the bottom of every public page. Every Product link and
+// About go to the one set of pages with the nav down the left (HELP_NAV in
+// routes/GettingStartedPage.tsx), in the same order as that nav. Signed-in app screens and the
 // trial page are tighter on room, so they get <Copyright> instead.
 export function SiteFooter() {
   return (
@@ -22,15 +23,14 @@ export function SiteFooter() {
       </div>
       <nav className="site-footer-col" aria-label="Product">
         <h3>Product</h3>
-        <Link to="/#why-its-different">Why?</Link>
+        <Link to="/welcome">What is this?</Link>
+        <Link to="/help/getting-started">Getting started with AI</Link>
         <Link to="/whats-new">What's new</Link>
-        <Link to="/pricing">Pricing transparency</Link>
-        <Link to="/tips">Tips + tricks</Link>
         <Link to="/help">Help</Link>
       </nav>
       <nav className="site-footer-col" aria-label="Team">
         <h3>Team</h3>
-        <Link to="/about">About</Link>
+        <Link to="/welcome#who-we-are">About</Link>
         <Link to="/privacy">Privacy</Link>
         <Link to="/terms">Terms</Link>
       </nav>

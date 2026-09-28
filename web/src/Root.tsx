@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import App from "./App";
 import { Visitor } from "./Visitor";
 import { Username } from "./components/Username";
 import { Admin } from "./components/Admin";
 import { Legal } from "./components/Legal";
-import { Billing } from "./components/Billing";
-import { AboutPage, PricingPage, WhatsNewPage } from "./routes/StaticPages";
+import { WhatsNewPage } from "./routes/StaticPages";
 import { HelpPage } from "./routes/HelpPage";
-import { TipsPage } from "./routes/TipsPage";
+import { GettingStartedPage } from "./routes/GettingStartedPage";
+import { SettingsPage } from "./routes/SettingsPage";
+import { WelcomePage } from "./routes/WelcomePage";
 import { authClient } from "./auth";
 import { getMe, type Me } from "./api";
 
@@ -17,8 +18,8 @@ import { getMe, type Me } from "./api";
 //
 //   no session        Visitor: the home page, sign-in screens, public pages
 //   no username yet   the username step (and the legal pages it links to)
-//   signed in         /admin, /billing, public pages; everything else is App,
-//                     which routes / and /c/<id> itself
+//   signed in         /admin, /settings, /welcome, public pages; everything
+//                     else is App, which routes / and /c/<id> itself
 export default function Root() {
   const { data: session, isPending } = authClient.useSession();
   const [me, setMe] = useState<Me | null>(null);
@@ -59,22 +60,26 @@ export default function Root() {
     <Routes>
       <Route path="/terms" element={<Legal page="terms" />} />
       <Route path="/privacy" element={<Legal page="privacy" />} />
-      <Route path="/about" element={<AboutPage />} />
+      <Route path="/about" element={<Navigate to="/welcome#who-we-are" replace />} />
       <Route path="/whats-new" element={<WhatsNewPage />} />
-      <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/pricing" element={<Navigate to="/welcome#what-it-costs" replace />} />
       <Route path="/help" element={<HelpPage me={me} />} />
-      <Route path="/tips" element={<TipsPage />} />
+      <Route path="/help/getting-started" element={<GettingStartedPage />} />
+      <Route path="/tips" element={<Navigate to="/help/getting-started" replace />} />
+      <Route path="/welcome" element={<WelcomePage />} />
+      <Route path="/settings" element={<SettingsPage me={me} onMeChange={setMe} />} />
+      <Route path="/settings/credits" element={<SettingsPage me={me} onMeChange={setMe} />} />
       <Route path="/admin" element={me.isAdmin ? <Admin me={me} /> : <Navigate to="/" replace />} />
-      {/* /usage is where Stripe's portal was told to send people back to; it
-          gets its own page in Phase 4. */}
-      <Route path="/billing" element={<Billing me={me} />} />
-      <Route path="/usage" element={<Billing me={me} />} />
+      {/* Where credits lived before Settings, and where older Stripe sessions
+          send people back to. The query string (?checkout=success) rides
+          along so the thank-you still shows. */}
+      <Route path="/billing" element={<ToCredits />} />
+      <Route path="/usage" element={<ToCredits />} />
       <Route
         path="*"
         element={
           <App
             me={me}
-            onMeChange={setMe}
             onSignOut={async () => {
               await authClient.signOut();
             }}
@@ -83,4 +88,9 @@ export default function Root() {
       />
     </Routes>
   );
+}
+
+function ToCredits() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: "/settings/credits", search }} replace />;
 }

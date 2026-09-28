@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { DocPage } from "./StaticPages";
+import { SideNavPage, type NavGroup } from "../components/SideNavPage";
+import { HOME_SECTIONS } from "./HomePage";
 import config from "../../../worker/config.json";
 
-// /tips: a plain guide to using a chat model well, for people who haven't
-// spent much time with one. Linked from the footer, Help, and the models
-// panel under the message box. Each section is a question someone has
+// /help/getting-started: a plain guide to using a chat model well, for
+// people who haven't spent much time with one. Linked from the footer, Help,
+// and the "?" beside the model name. Each section is a question someone has
 // actually asked; add new ones where they fit, not at the end.
-const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
+export const GETTING_STARTED_SECTIONS: { id: string; title: string; body: ReactNode }[] = [
   {
     id: "how-it-works",
     title: "What is this thing, really?",
@@ -227,7 +228,7 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
           flat monthly plan whether you use it or not. We didn't train anything. We rent time on open models from
           Cloudflare, charge {config.costs.markup === 2 ? "twice" : `${config.costs.markup} times`} what that costs us, and
           you pay only for what you use. There are no ads, no investors, and two of us. The{" "}
-          <Link to="/pricing">pricing page</Link> shows where every dollar goes.
+          <Link to="/welcome#what-it-costs-us">About Lechuga</Link> page shows where every dollar goes.
         </p>
       </>
     ),
@@ -335,26 +336,47 @@ const SECTIONS: { id: string; title: string; body: ReactNode }[] = [
   },
 ];
 
-export function TipsPage() {
+// Every public page, as the nav down their left shows them: About Lechuga
+// (routes/WelcomePage.tsx) is what the signed-out home page says, Help lists
+// its three parts, this page lists every question above, and pricing and
+// what's new are in routes/StaticPages.tsx. The footer links to the same
+// pages, so wherever you come in you land in this one set.
+export const HELP_NAV: NavGroup[] = [
+  {
+    to: "/welcome",
+    label: "About Lechuga",
+    sections: [...HOME_SECTIONS.map((s) => ({ id: s.id, label: s.title })), { id: "who-we-are", label: "Who we are" }],
+  },
+  {
+    to: "/help/getting-started",
+    label: "Getting started with AI",
+    sections: GETTING_STARTED_SECTIONS.map((s) => ({ id: s.id, label: s.title })),
+  },
+  { to: "/whats-new", label: "What's new" },
+  {
+    to: "/help",
+    label: "Help",
+    sections: [
+      { id: "questions", label: "Questions" },
+      { id: "how-to", label: "How to use it" },
+      { id: "feedback", label: "Feedback" },
+    ],
+  },
+];
+
+export function GettingStartedPage() {
   return (
-    <DocPage title="Tips + tricks">
+    <SideNavPage title="Getting started with AI" nav={HELP_NAV}>
       <p>
         How to get the most out of a chat model, and what to watch for, written for people who haven't spent much time
         with one. None of it is specific to Lechuga except where it says so.
       </p>
-      <nav className="tips-contents" aria-label="On this page">
-        {SECTIONS.map((s) => (
-          <a key={s.id} href={`#${s.id}`}>
-            {s.title}
-          </a>
-        ))}
-      </nav>
-      {SECTIONS.map((s) => (
+      {GETTING_STARTED_SECTIONS.map((s) => (
         <section key={s.id} id={s.id} className="tips-section">
           <h2>{s.title}</h2>
           {s.body}
         </section>
       ))}
-    </DocPage>
+    </SideNavPage>
   );
 }
