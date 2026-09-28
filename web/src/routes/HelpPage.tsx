@@ -75,7 +75,7 @@ export function HelpPage({ me }: Props) {
           <li>Drag a file onto the page (a PDF, a document, a spreadsheet, code, or a picture if you're on GLM 5.3 Flash), or paste in something long, and it becomes a card attached to your message.</li>
           <li>Next to the model is how hard it should think. Low is quick and cheap; high is slower and better on hard problems.</li>
           <li>Pick a model under the box before you start a chat. A chat keeps the model it started with.</li>
-          <li>Your credit balance is in the sidebar; click it to buy more or manage a subscription.</li>
+          <li>Your credit balance is in the sidebar. To buy more or manage a subscription, choose More credits from the menu behind your name.</li>
           <li>Invite a friend from the menu behind your name.</li>
           <li>
             Delete your account at the foot of the <a href="/billing">credits page</a>.

@@ -123,6 +123,11 @@ export function Sidebar({
             <button type="button" onClick={() => openDialog("profile")}>
               Profile
             </button>
+            {/* Where "manage" beside the balance used to go. The number below
+                is just a number now; buying happens from here. */}
+            <Link to="/billing" role="menuitem" onClick={() => setMenuOpen(false)}>
+              More credits
+            </Link>
             <button type="button" onClick={() => openDialog("invite")}>
               Invite someone <span className="menu-count">{remaining} left</span>
             </button>
@@ -157,10 +162,7 @@ export function Sidebar({
             </div>
           </div>
         )}
-        <a className={`balance-link ${balance <= 0 ? "empty" : ""}`} href="/billing" title="Credits: see, buy, subscribe">
-          <span>{balance.toLocaleString()} credits</span>
-          <span className="balance-link-action">{balance <= 0 && me.creditsEnforced ? "get more" : "manage"}</span>
-        </a>
+        <div className={`sidebar-balance ${balance <= 0 ? "empty" : ""}`}>{balance.toLocaleString()} credits</div>
         <button
           type="button"
           className="account-btn"

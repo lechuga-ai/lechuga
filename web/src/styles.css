@@ -2761,28 +2761,19 @@ button {
   font-weight: 500;
 }
 
-.balance-link {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
+/* Only a number: "manage" beside it became "More credits" in the account
+   menu above, so there's nothing here to click and nothing to hover. It
+   keeps the menu's padding so the figure lines up under its items. */
+.sidebar-balance {
   padding: 6px 10px;
-  border-radius: 10px;
   font-size: 12px;
   color: var(--box-dim);
-  text-decoration: none;
   font-variant-numeric: tabular-nums;
 }
 
-.balance-link:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.balance-link-action {
-  color: var(--box-faint);
-}
-
-.balance-link.empty,
-.balance-link.empty .balance-link-action {
+/* Out of credits. Red on its own now, with no "get more" beside it: the
+   reply that was refused carries the link to buy, where it's needed. */
+.sidebar-balance.empty {
   color: #b3261e;
 }
 
