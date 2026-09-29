@@ -139,6 +139,21 @@ npm run deploy:dev                               # builds the web app, uploads w
 
 Three outside registrations are tied to a tier's hostname and must follow it if it changes: the Turnstile widget's hostnames, the Google OAuth redirect URI (`<BASE_URL>/api/auth/callback/google`), and the Stripe webhook URL (`<BASE_URL>/api/billing/webhook`).
 
+## Releasing
+
+**The website.** Apply any new migration to dev, then prod (`npm run db:migrate:<tier>:<n> --workspace worker`), always before the code that needs it. Then `npm run deploy:dev`, look at dev.lechuga.ai, then `npm run deploy:prod`. Each deploy builds the web app and uploads it with the worker. If the release is worth telling people about, it gets an entry in `NEWS` (see Changing things).
+
+**The iOS app, to TestFlight or the App Store.** The app talks to whatever worker is live, so a build that needs a worker change goes out after that worker.
+
+1. In `web/.env.native`, point `VITE_API_BASE` at the tier the build should talk to: `https://lechuga.ai` for anything other people will run.
+2. From `web/`: `npm run cap:sync` (builds the web app for the shell and copies it into `ios/` and `android/`).
+3. `npm run ios` opens Xcode. In the App target's General tab, raise **Build**: Apple refuses a second upload with the same number. Version changes only when people should notice.
+4. Set the destination to **Any iOS Device (arm64)**, then Product > Archive. In the Organizer: Distribute App > TestFlight & App Store > Upload. Signing is automatic; the project already declares it uses only standard HTTPS encryption, so there is no export-compliance question.
+5. In App Store Connect, the app's TestFlight tab shows the build once processed (10 to 30 minutes). Internal testers get it immediately. External testers need Beta App Review once per version: it asks for a privacy policy URL (`https://lechuga.ai/privacy`) and notes for the reviewer; say the app is invite only and give them an invited address.
+6. For the App Store itself, the same archive is submitted from the app's distribution page with the listing filled in. "Make this app available on Mac" under Pricing and Availability is what puts it on Apple silicon Macs.
+
+**The Android app.** Not yet released. When it is: a release keystore (kept out of the repo, see `web/android/.gitignore`, and backed up: losing it means never updating the app again), `npm run android`, Build > Generate Signed Bundle, and the Play Console.
+
 ## Changing things
 
 - **Schema:** add `worker/src/db/000N_name.sql` and its three scripts in `worker/package.json`. Apply it local, then dev, then prod, and always **before** deploying code that needs it. SQLite can't add a column twice, so a migration runs once per database.
