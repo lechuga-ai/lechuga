@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
-import { ViewMenu } from "./components/ViewMenu";
 import { StartPage } from "./routes/StartPage";
 import { ChatPage } from "./routes/ChatPage";
 import { setStartMessage } from "./startMessage";
@@ -128,9 +127,9 @@ export default function App({ me, onSignOut }: Props) {
     navigate(`/c/${id}`);
   }
 
-  function handleNewChat() {
-    setDrawerOpen(false);
-    navigate("/");
+  // From a bot's dots in the sidebar: the start page, with that bot.
+  function handleNewChat(botId: string) {
+    selectBot(botId);
   }
 
   // The ✕ beside a chat. On my own chat it deletes it, for everyone in it; on
@@ -181,12 +180,9 @@ export default function App({ me, onSignOut }: Props) {
         {drawerOpen ? "✕" : "☰"}
       </button>
       {drawerOpen && <div className="drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
-      <ViewMenu botId={selectedBot?.id ?? null} />
       <Sidebar
         chats={chats}
         bots={bots}
-        selectedBotId={selectedBot?.id ?? null}
-        onSelectBot={selectBot}
         onBotCreated={handleBotCreated}
         activeChatId={activeChatId}
         open={drawerOpen}

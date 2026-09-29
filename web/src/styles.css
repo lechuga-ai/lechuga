@@ -248,42 +248,30 @@ button {
   line-height: 1;
 }
 
-/* Which bot the chats below are with, and the switch to another. */
-.bot-switch {
+/* A bot in the list: a group with a bar down its left in the bot's colour,
+   a header row (name, the faces once it's shared, the dots), and its chats. */
+.bot-group {
+  border-left: 3px solid #c9cfc3;
+  padding-left: 6px;
+  margin: 0 0 12px 2px;
+}
+
+.bot-group.shared {
+  border-left-style: dashed;
+}
+
+.bot-row {
   position: relative;
-  margin-bottom: 8px;
-}
-
-.bot-switch-label {
-  display: block;
-  margin: 0 0 4px 8px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #98a092;
-}
-
-.bot-switch-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.5);
+  gap: 6px;
+  padding: 4px 4px 4px 8px;
   color: #1e221b;
-  font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
-  text-align: left;
 }
 
-.bot-switch-btn:hover {
-  background: rgba(255, 255, 255, 0.85);
-}
-
-.bot-switch-name {
+.bot-row-name {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -291,12 +279,32 @@ button {
   white-space: nowrap;
 }
 
-.bot-menu {
+.bot-row-dots {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: #98a092;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.bot-row:hover .bot-row-dots,
+.bot-row-dots[aria-expanded="true"] {
+  color: #1e221b;
+}
+
+.bot-row-dots:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.bot-row-menu {
   position: absolute;
-  left: 0;
   right: 0;
-  top: calc(100% + 4px);
+  top: calc(100% + 2px);
   z-index: 5;
+  min-width: 150px;
   display: flex;
   flex-direction: column;
   padding: 6px;
@@ -304,13 +312,13 @@ button {
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  font-weight: 400;
 }
 
-.bot-menu button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 10px;
+.bot-row-menu button,
+.bot-row-menu a {
+  display: block;
+  padding: 8px 10px;
   border: none;
   border-radius: 8px;
   background: transparent;
@@ -318,64 +326,11 @@ button {
   font: inherit;
   font-size: 13px;
   text-align: left;
-}
-
-.bot-menu button:hover {
-  background: rgba(0, 0, 0, 0.05);
-}
-
-.bot-menu button.current {
-  font-weight: 600;
-}
-
-/* Three dots at the top right of the chat view: Bot Manager, Account, Help. */
-.view-menu-btn {
-  position: fixed;
-  top: calc(14px + env(safe-area-inset-top, 0px));
-  right: calc(14px + env(safe-area-inset-right, 0px));
-  z-index: 20;
-  width: 34px;
-  height: 34px;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  color: #1e221b;
-  border-radius: 10px;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.view-menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 19;
-}
-
-.view-menu {
-  position: fixed;
-  top: calc(52px + env(safe-area-inset-top, 0px));
-  right: calc(14px + env(safe-area-inset-right, 0px));
-  z-index: 20;
-  min-width: 160px;
-  display: flex;
-  flex-direction: column;
-  padding: 6px;
-  background: var(--box);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-}
-
-.view-menu a {
-  display: block;
-  padding: 8px 10px;
-  border-radius: 8px;
-  color: var(--box-text);
-  font-family: var(--sans);
-  font-size: 13px;
   text-decoration: none;
 }
 
-.view-menu a:hover {
+.bot-row-menu button:hover,
+.bot-row-menu a:hover {
   background: rgba(0, 0, 0, 0.05);
 }
 
@@ -412,28 +367,6 @@ button {
   line-height: 1.5;
   color: var(--box-dim);
   margin: 0 0 16px;
-}
-
-/* The "Shared with me" line, above the first chat that isn't mine. */
-.chat-list-label {
-  flex-basis: 100%;
-  margin: 8px 0 2px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #98a092;
-  cursor: default;
-}
-
-.new-chat-btn {
-  background: var(--accent);
-  color: #ffffff;
-  border: none;
-  border-radius: 10px;
-  padding: 9px 14px;
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 18px;
 }
 
 .chat-list {

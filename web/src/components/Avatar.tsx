@@ -41,7 +41,7 @@ function usePhotoSrc(url: string | null): string | null {
 // whose chat it is.
 const COLOURS = ["#6fae3b", "#c9803a", "#4f8fb8", "#b0609a", "#8a7bc8", "#3f9c8c", "#c25e5e", "#9a9a3a"];
 
-function colourFor(id: string): string {
+export function colourFor(id: string): string {
   let sum = 0;
   for (const ch of id) sum = (sum * 31 + ch.charCodeAt(0)) >>> 0;
   return COLOURS[sum % COLOURS.length];
