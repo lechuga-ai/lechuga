@@ -145,7 +145,7 @@ Three outside registrations are tied to a tier's hostname and must follow it if 
 
 ## Releasing
 
-**The website.** Apply any new migration to dev, then prod (`npm run db:migrate:<tier>:<n> --workspace worker`), always before the code that needs it. Then `npm run deploy:dev`, look at dev.lechuga.ai, then `npm run deploy:prod`. Each deploy builds the web app and uploads it with the worker. If the release is worth telling people about, it gets an entry in `NEWS` (see Changing things).
+**The website.** Apply any new migration to dev, then prod (`npm run db:migrate:<tier>:<n> --workspace worker`), always before the code that needs it. Then `npm run deploy:dev`, look at dev.lechuga.ai, then `npm run deploy:prod`. Each deploy builds the web app and uploads it with the worker, whether you run it from the repo root or from `worker/` (a `predeploy` step in `worker/package.json` does the build, so there is no way to ship stale pages). If the release is worth telling people about, it gets an entry in `NEWS` (see Changing things).
 
 **The iOS app, to TestFlight or the App Store.** The app talks to whatever worker is live, so a build that needs a worker change goes out after that worker.
 
