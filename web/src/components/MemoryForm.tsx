@@ -94,7 +94,7 @@ export function MemoryForm() {
             Learn from my chats overnight
             {memory.trainedAt && <span className="settings-check-note">last learned {new Date(memory.trainedAt).toLocaleDateString("en-US", { month: "long", day: "numeric" })}</span>}
           </label>
-          <label htmlFor="memory-notes">Notes: what to remember about you</label>
+          <label htmlFor="memory-notes">About you</label>
           <textarea
             id="memory-notes"
             value={notes}
@@ -107,7 +107,7 @@ export function MemoryForm() {
           <p className="settings-count">
             {notes.length.toLocaleString()} of {MAX.toLocaleString()} characters
           </p>
-          <label htmlFor="memory-soul">Soul: how to be with you</label>
+          <label htmlFor="memory-soul">How Lechuga should talk to you</label>
           <textarea
             id="memory-soul"
             value={soul}

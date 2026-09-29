@@ -91,7 +91,7 @@ const NEWS: NewsEntry[] = [
     items: [
       {
         lead: "A memory, in two notes.",
-        text: "What to remember about you (what you're working on, what you like) and how to be with you (short answers, no bullet points, whatever you'd want). Both live under Account, then Memory, where you can read them, rewrite them, switch them off, or wipe them. They go with every message in your own chats and never in a shared one, so they cost a few credits a message while they're not empty.",
+        text: "About you (what you're working on, what you like) and how Lechuga should talk to you (short answers, no bullet points, whatever you'd want). Both live under Account, then Memory, where you can read them, rewrite them, switch them off, or wipe them. They go with every message in your own chats and never in a shared one, so they cost a few credits a message while they're not empty.",
       },
       {
         lead: "Remember, beside Share.",
