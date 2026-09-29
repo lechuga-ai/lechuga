@@ -2,6 +2,7 @@ import { useLocation } from "react-router-dom";
 import { SideNavPage, type NavGroup } from "../components/SideNavPage";
 import { ProfileForm } from "../components/ProfileForm";
 import { BillingPanel } from "../components/Billing";
+import { MemoryForm } from "../components/MemoryForm";
 import type { Me } from "../api";
 import { NATIVE } from "../native";
 
@@ -13,6 +14,7 @@ type Props = {
 
 const NAV: NavGroup[] = [
   { to: "/settings", label: "Profile" },
+  { to: "/settings/memory", label: "Memory" },
   {
     to: "/settings/credits",
     label: "Credits",
@@ -27,14 +29,22 @@ const NAV: NavGroup[] = [
 ];
 
 // /settings, "Account" in the menu behind your name: everything about the
-// account that isn't a chat, one page per entry in the nav. Profile is your name and photo; Credits is the balance,
-// buying, the subscription, and (at the foot) deleting the account.
+// account that isn't a chat, one page per entry in the nav. Profile is your
+// name and photo; Memory is what Lechuga carries between your chats; Credits
+// is the balance, buying, the subscription, and (at the foot) deleting the
+// account.
 export function SettingsPage({ me, onMeChange }: Props) {
   const { pathname } = useLocation();
-  const credits = pathname === "/settings/credits";
+  const page = pathname === "/settings/credits" ? "Credits" : pathname === "/settings/memory" ? "Memory" : "Profile";
   return (
-    <SideNavPage title={credits ? "Credits" : "Profile"} nav={NAV} navLabel="Account">
-      {credits ? <BillingPanel me={me} /> : <ProfileForm me={me} onSaved={(profile) => onMeChange({ ...me, ...profile })} />}
+    <SideNavPage title={page} nav={NAV} navLabel="Account">
+      {page === "Credits" ? (
+        <BillingPanel me={me} />
+      ) : page === "Memory" ? (
+        <MemoryForm />
+      ) : (
+        <ProfileForm me={me} onSaved={(profile) => onMeChange({ ...me, ...profile })} />
+      )}
     </SideNavPage>
   );
 }

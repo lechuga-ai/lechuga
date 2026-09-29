@@ -4062,6 +4062,48 @@ button {
   border-color: rgba(111, 174, 59, 0.6);
 }
 
+/* The two memory notes: the same box as an input, taller and stretchable. */
+.settings-form textarea {
+  display: block;
+  width: 100%;
+  max-width: 560px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.settings-form textarea:focus {
+  outline: none;
+  border-color: rgba(111, 174, 59, 0.6);
+}
+
+.settings-form .settings-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  color: var(--box-text);
+}
+
+.settings-form .settings-check input {
+  width: auto;
+}
+
+.settings-check-note {
+  font-size: 12px;
+  color: var(--box-dim);
+}
+
+.doc-inner .settings-panel p.settings-count {
+  margin: 4px 0 16px;
+  font-size: 12px;
+}
+
 .settings-form .modal-actions {
   justify-content: flex-start;
   align-items: center;

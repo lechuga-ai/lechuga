@@ -72,6 +72,14 @@
     "web_search": { "results": 6, "cost_usd": 0.005, "credits": 100, "free_per_month": 2000 },
     "read_page": { "max_bytes": 3000000, "max_chars": 14000 }
   },
+  "nightly": {
+    "_comment": "The overnight memory pass (worker/src/nightly.ts). When it runs is the cron in wrangler.toml. train_tokens caps what's read per person per night; a person's turns and Lechuga's replies are each cut to a length; fewer than min_turns typed since the last pass and they're skipped.",
+    "train_tokens": 24000,
+    "turn_chars": 4000,
+    "reply_chars": 1200,
+    "min_turns": 2,
+    "concurrency": 3
+  },
   "stripe_managed_payments": true,
   "costs": {
     "markup": 2,
@@ -329,6 +337,8 @@
     "paste_becomes_attachment_chars": 3000,
     "max_reply_tokens": 16384,
     "summary_tokens": 3000,
+    "memory_chars": 3000,
+    "remember_tokens": 2500,
     "compact_offer_tokens": 8000,
     "public_requests_per_day": 200,
     "chat_members": 10,

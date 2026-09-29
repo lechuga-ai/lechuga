@@ -70,6 +70,7 @@ export default function Root() {
       <Route path="/welcome" element={<WelcomePage />} />
       <Route path="/settings" element={<SettingsPage me={me} onMeChange={setMe} />} />
       <Route path="/settings/credits" element={<SettingsPage me={me} onMeChange={setMe} />} />
+      <Route path="/settings/memory" element={<SettingsPage me={me} onMeChange={setMe} />} />
       <Route path="/admin" element={me.isAdmin ? <Admin me={me} /> : <Navigate to="/" replace />} />
       {/* Where credits lived before Settings, and where older Stripe sessions
           send people back to. The query string (?checkout=success) rides
