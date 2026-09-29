@@ -3,6 +3,7 @@ import { SideNavPage, type NavGroup } from "../components/SideNavPage";
 import { ProfileForm } from "../components/ProfileForm";
 import { BillingPanel } from "../components/Billing";
 import type { Me } from "../api";
+import { NATIVE } from "../native";
 
 type Props = {
   me: Me;
@@ -20,7 +21,8 @@ const NAV: NavGroup[] = [
       { id: "buy", label: "Buy credits" },
       { id: "purchases", label: "Your purchases" },
       { id: "account", label: "Your account" },
-    ],
+      // The native app doesn't sell credits (Billing.tsx), so no entry for it.
+    ].filter((s) => !(NATIVE && s.id === "buy")),
   },
 ];
 

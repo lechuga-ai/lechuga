@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { adminEmails, type AppEnv } from "./types";
 import { chat } from "./chat";
 import { AUTH_BASE_PATH, createAuth, publicAuthConfig } from "./auth";
@@ -12,6 +13,7 @@ import { billingWebhook } from "./billing-webhook";
 import { trial } from "./trial";
 import { convert } from "./convert";
 import config from "../config.json";
+import { APP_ORIGINS } from "./native-app";
 
 const app = new Hono<AppEnv>();
 
@@ -23,6 +25,20 @@ app.use("*", async (c, next) => {
   }
   await next();
 });
+
+// The native apps call the API from the origins in native-app.ts; those, and
+// only those, get CORS headers. Visits to the site are same-origin and get
+// none. The browser's preflight (OPTIONS) is answered here, so it comes before
+// the session check, which it could never pass.
+app.use(
+  "/api/*",
+  cors({
+    origin: (origin) => (APP_ORIGINS.includes(origin) ? origin : null),
+    allowHeaders: ["authorization", "content-type", "x-captcha-response"],
+    exposeHeaders: ["set-auth-token"],
+    maxAge: 86400,
+  })
+);
 
 // One Better Auth instance per request, shared by the routes below.
 app.use("/api/*", async (c, next) => {

@@ -1,6 +1,9 @@
 import { parseSSE } from "../../worker/src/sse";
 import type { Attachment } from "../../worker/src/attachments";
 import { getEffort } from "./effort";
+// Inside the native app this adds the API's address and the sign-in token;
+// on the website it is plain fetch.
+import { apiFetch } from "./native";
 
 // What the app shows of another account: a name and a face, never an email.
 // photo is the avatar's version, or null for none (see avatarUrl).
@@ -106,15 +109,15 @@ export type AuthConfig = {
 
 // Public; served before there is a session.
 export async function getAuthConfig(): Promise<AuthConfig> {
-  return expectJson(await fetch("/api/config"));
+  return expectJson(await apiFetch("/api/config"));
 }
 
 export async function listModels(): Promise<Model[]> {
-  return expectJson(await fetch("/api/models"));
+  return expectJson(await apiFetch("/api/models"));
 }
 
 export async function listChats(): Promise<Chat[]> {
-  return expectJson(await fetch("/api/chats"));
+  return expectJson(await apiFetch("/api/chats"));
 }
 
 // Chats whose title or messages contain every word of q. snippet is the
@@ -123,12 +126,12 @@ export async function listChats(): Promise<Chat[]> {
 export type ChatHit = Chat & { snippet: string | null };
 
 export async function searchChats(q: string): Promise<ChatHit[]> {
-  return expectJson(await fetch(`/api/chats/search?q=${encodeURIComponent(q)}`));
+  return expectJson(await apiFetch(`/api/chats/search?q=${encodeURIComponent(q)}`));
 }
 
 export async function createChat(model?: string): Promise<{ id: string }> {
   return expectJson(
-    await fetch("/api/chats", {
+    await apiFetch("/api/chats", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ model }),
@@ -137,7 +140,7 @@ export async function createChat(model?: string): Promise<{ id: string }> {
 }
 
 export async function getChat(id: string): Promise<{ chat: Chat; messages: Message[]; role: "owner" | "member"; roster: Roster }> {
-  return expectJson(await fetch(`/api/chats/${id}`));
+  return expectJson(await apiFetch(`/api/chats/${id}`));
 }
 
 // Share a chat with a username or an email address. An address with no
@@ -149,15 +152,15 @@ export async function addChatMember(chatId: string, who: string, useInvite = fal
 
 // The owner removing someone, or (with your own id) leaving.
 export async function removeChatMember(chatId: string, userId: string): Promise<{ roster?: Roster }> {
-  return expectJson(await fetch(`/api/chats/${chatId}/members/${userId}`, { method: "DELETE" }));
+  return expectJson(await apiFetch(`/api/chats/${chatId}/members/${userId}`, { method: "DELETE" }));
 }
 
 export async function cancelPendingShare(chatId: string, pendingId: string): Promise<{ roster: Roster }> {
-  return expectJson(await fetch(`/api/chats/${chatId}/pending/${pendingId}`, { method: "DELETE" }));
+  return expectJson(await apiFetch(`/api/chats/${chatId}/pending/${pendingId}`, { method: "DELETE" }));
 }
 
 export async function deleteChat(id: string): Promise<void> {
-  await expectJson(await fetch(`/api/chats/${id}`, { method: "DELETE" }));
+  await expectJson(await apiFetch(`/api/chats/${id}`, { method: "DELETE" }));
 }
 
 export type Step = { id: string; label: string; links?: { title: string; url: string }[]; done: boolean };
@@ -189,7 +192,7 @@ export async function sendMessage(
 ): Promise<void> {
   let res: Response;
   try {
-    res = await fetch(`/api/chats/${chatId}/messages`, {
+    res = await apiFetch(`/api/chats/${chatId}/messages`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ content, attachments, effort: getEffort() }),
@@ -227,7 +230,7 @@ async function readReplyStream(res: Response, { onDelta, onReasoning, onNotice, 
 export async function sendTrialMessage(content: string, captcha: string, handlers: StreamHandlers): Promise<void> {
   let res: Response;
   try {
-    res = await fetch("/api/try", {
+    res = await apiFetch("/api/try", {
       method: "POST",
       headers: { "content-type": "application/json", "x-captcha-response": captcha },
       body: JSON.stringify({ content }),
@@ -264,7 +267,7 @@ export type Me = {
 };
 
 export async function getMe(): Promise<Me> {
-  return expectJson(await fetch("/api/me"));
+  return expectJson(await apiFetch("/api/me"));
 }
 
 // photo: a small square JPEG data URL, null to remove it, undefined to keep it.
@@ -298,7 +301,7 @@ export type Costs = {
 };
 
 export async function getBilling(): Promise<Billing> {
-  return expectJson(await fetch("/api/billing"));
+  return expectJson(await apiFetch("/api/billing"));
 }
 
 // Both return a URL on Stripe's site to send the browser to.
@@ -316,7 +319,7 @@ export function creditsAsDollars(credits: number): string {
 }
 
 export async function checkUsername(u: string): Promise<{ available: boolean; reason?: string }> {
-  return expectJson(await fetch(`/api/me/username/available?u=${encodeURIComponent(u)}`));
+  return expectJson(await apiFetch(`/api/me/username/available?u=${encodeURIComponent(u)}`));
 }
 
 export async function setUsername(username: string, acceptTerms: boolean): Promise<{ username: string }> {
@@ -336,7 +339,7 @@ export type Invite = {
 };
 
 export async function listInvites(): Promise<{ remaining: number; invites: Invite[] }> {
-  return expectJson(await fetch("/api/invites"));
+  return expectJson(await apiFetch("/api/invites"));
 }
 
 export async function createInvite(email: string): Promise<{ invite: Invite }> {
@@ -344,16 +347,16 @@ export async function createInvite(email: string): Promise<{ invite: Invite }> {
 }
 
 export async function revokeInvite(id: string): Promise<void> {
-  await expectJson(await fetch(`/api/invites/${id}`, { method: "DELETE" }));
+  await expectJson(await apiFetch(`/api/invites/${id}`, { method: "DELETE" }));
 }
 
 export async function lookupInvite(token: string): Promise<{ email: string; state: InviteState | "expired" }> {
-  return expectJson(await fetch(`/api/invites/lookup/${encodeURIComponent(token)}`));
+  return expectJson(await apiFetch(`/api/invites/lookup/${encodeURIComponent(token)}`));
 }
 
 export async function requestAccess(email: string, body: string, captcha: string): Promise<void> {
   await expectJson(
-    await fetch("/api/requests/access", {
+    await apiFetch("/api/requests/access", {
       method: "POST",
       headers: { "content-type": "application/json", "x-captcha-response": captcha },
       body: JSON.stringify({ email, body }),
@@ -371,7 +374,7 @@ export async function sendNote(type: NoteType, body: string): Promise<void> {
 // people see "Send us a note" (sendNote) on the same page instead.
 export async function sendFeedback(body: string, email: string, captcha: string): Promise<void> {
   await expectJson(
-    await fetch("/api/requests/feedback", {
+    await apiFetch("/api/requests/feedback", {
       method: "POST",
       headers: { "content-type": "application/json", "x-captcha-response": captcha },
       body: JSON.stringify({ body, email }),
@@ -402,7 +405,7 @@ export async function adminListRequests(filter: { type?: string; status?: string
   const q = new URLSearchParams();
   if (filter.type) q.set("type", filter.type);
   if (filter.status) q.set("status", filter.status);
-  return expectJson(await fetch(`/api/admin/requests?${q}`));
+  return expectJson(await apiFetch(`/api/admin/requests?${q}`));
 }
 
 export async function adminRequestAction(
@@ -427,7 +430,7 @@ export type AdminUser = {
 export type AdminInvite = Omit<Invite, "expired"> & { sent_by: string | null };
 
 export async function adminInvites(): Promise<{ users: AdminUser[]; invites: AdminInvite[] }> {
-  return expectJson(await fetch("/api/admin/invites"));
+  return expectJson(await apiFetch("/api/admin/invites"));
 }
 
 export async function adminSetInvites(userId: string, n: number): Promise<void> {
@@ -439,7 +442,7 @@ export async function adminSetUsername(userId: string, username: string): Promis
 }
 
 function postJson(url: string, body: unknown, method: "POST" | "PUT" = "POST"): Promise<Response> {
-  return fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  return apiFetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 }
 
 // The Accounts tab. Credits are whole numbers; cost_usd is dollars we owe
@@ -494,7 +497,7 @@ export type AdminGateway = {
 export type AdminGrant = { id: string; delta: number; note: string | null; created_at: number; username: string | null; email: string };
 
 export async function adminGrants(): Promise<AdminGrant[]> {
-  return expectJson(await fetch("/api/admin/grants"));
+  return expectJson(await apiFetch("/api/admin/grants"));
 }
 
 // An invite from us: nobody's invite count is spent.
@@ -508,11 +511,11 @@ export async function adminAccounts(): Promise<{
   trials: { total: number; today: number };
   gateway: AdminGateway;
 }> {
-  return expectJson(await fetch("/api/admin/accounts"));
+  return expectJson(await apiFetch("/api/admin/accounts"));
 }
 
 export async function adminLedger(userId: string): Promise<AdminLedgerRow[]> {
-  return expectJson(await fetch(`/api/admin/users/${userId}/ledger`));
+  return expectJson(await apiFetch(`/api/admin/users/${userId}/ledger`));
 }
 
 export async function adminGrant(userId: string, credits: number, note: string): Promise<void> {
@@ -527,7 +530,7 @@ export async function adminSetSuspended(userId: string, suspended: boolean): Pro
 export async function convertFile(file: File): Promise<{ name: string; text: string }> {
   const form = new FormData();
   form.append("file", file, file.name);
-  return expectJson(await fetch("/api/convert", { method: "POST", body: form }));
+  return expectJson(await apiFetch("/api/convert", { method: "POST", body: form }));
 }
 
 // "Compact this chat": the worker has the model summarise the conversation,
@@ -593,5 +596,5 @@ export async function adminActivity(days: number): Promise<{
   window: { days: number; since: number; start_of_today: number };
   markup: number;
 }> {
-  return expectJson(await fetch(`/api/admin/activity?days=${days}`));
+  return expectJson(await apiFetch(`/api/admin/activity?days=${days}`));
 }

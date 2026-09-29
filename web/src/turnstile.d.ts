@@ -4,7 +4,8 @@ interface TurnstileRenderOptions {
   sitekey: string;
   callback: (token: string) => void;
   "expired-callback"?: () => void;
-  "error-callback"?: () => void;
+  // Called with Turnstile's error code, e.g. "110200" (hostname not allowed).
+  "error-callback"?: (code?: string) => void;
   theme?: "light" | "dark" | "auto";
   size?: "normal" | "compact" | "flexible";
 }

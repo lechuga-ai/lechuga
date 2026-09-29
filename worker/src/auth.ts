@@ -1,12 +1,14 @@
 import { betterAuth } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
-import { captcha, magicLink } from "better-auth/plugins";
+import { bearer, captcha, emailOTP, magicLink } from "better-auth/plugins";
 import { adminEmails, type Env } from "./types";
 import { sendEmail } from "./email";
 import { acceptInvite, hasAccount, normalizeEmail, pendingInviteFor } from "./invites";
 import { applyOnce } from "./credits";
+import { passesBotCheck } from "./turnstile";
 import { claimPendingShares } from "./sharing";
 import config from "../config.json";
+import { APP_ORIGINS } from "./native-app";
 
 // Better Auth is mounted under this path; the SPA's client uses the same
 // default, so nothing on the web side needs to know it.
@@ -14,6 +16,16 @@ export const AUTH_BASE_PATH = "/api/auth";
 
 // How long a magic link stays valid.
 const MAGIC_LINK_TTL_SECONDS = 15 * 60;
+// How long a sign-in code stays valid.
+const SIGN_IN_CODE_TTL_SECONDS = 10 * 60;
+
+// The two ways a sign-in starts: asking for a link, or asking for a code.
+// Both send mail, so both sit behind the invite gate and the bot check. The
+// link's check is the captcha plugin's; the code's is ours (passesBotCheck),
+// because the native apps can't run Turnstile and have to be let through.
+const MAGIC_LINK_PATH = "/sign-in/magic-link";
+const CODE_PATH = "/email-otp/send-verification-otp";
+const SIGN_IN_STARTS = new Set([MAGIC_LINK_PATH, CODE_PATH]);
 
 // Built once per request. On Workers the D1 binding only exists inside a
 // request, so there is no module-level instance to share.
@@ -35,7 +47,8 @@ export function createAuth(env: Env) {
     basePath: AUTH_BASE_PATH,
     secret: env.BETTER_AUTH_SECRET,
     database: env.DB,
-    trustedOrigins: [env.BASE_URL],
+    // The site, and the native apps' origins (native-app.ts).
+    trustedOrigins: [env.BASE_URL, ...APP_ORIGINS],
 
     // Google sign-in is offered only where both halves are configured
     // (plan v3: "each optional per environment").
@@ -85,11 +98,14 @@ export function createAuth(env: Env) {
     },
 
     hooks: {
-      // Refuse magic-link requests for uninvited emails before any mail goes
-      // out. The same wording for every refused address: it says the site is
-      // invite only, not whether the address is known.
+      // Refuse link and code requests for uninvited emails before any mail
+      // goes out. The same wording for every refused address: it says the
+      // site is invite only, not whether the address is known.
       before: createAuthMiddleware(async (ctx) => {
-        if (ctx.path !== "/sign-in/magic-link") return;
+        if (!SIGN_IN_STARTS.has(ctx.path)) return;
+        if (ctx.path === CODE_PATH && !(await passesBotCheck(env, ctx.headers ?? new Headers()))) {
+          throw new APIError("BAD_REQUEST", { code: "CAPTCHA_FAILED", message: "the sign-in check failed; reload and try again" });
+        }
         const email = normalizeEmail((ctx.body as { email?: unknown } | undefined)?.email);
         if (!email) return;
         if (await allowed(email)) return;
@@ -122,11 +138,18 @@ export function createAuth(env: Env) {
     },
 
     plugins: [
+      // The native apps' sign-in: the session token is returned in a
+      // set-auth-token header when a sign-in completes, and accepted back as
+      // Authorization: Bearer on every request, in place of the cookie the
+      // website uses (web/src/native.ts). Harmless for the site: a request
+      // without the header is handled exactly as before.
+      bearer(),
       captcha({
         provider: "cloudflare-turnstile",
         secretKey: env.TURNSTILE_SECRET,
         // The plugin's default list only covers email/password endpoints.
-        endpoints: ["/sign-in/magic-link"],
+        // Only the link: the code's check is in the hook above.
+        endpoints: [MAGIC_LINK_PATH],
       }),
       magicLink({
         expiresIn: MAGIC_LINK_TTL_SECONDS,
@@ -140,6 +163,33 @@ export function createAuth(env: Env) {
               url,
               "",
               "It works once and expires in 15 minutes. If you didn't ask for it, ignore this email.",
+            ].join("\n"),
+          });
+        },
+      }),
+      // The same sign-in as a six-digit code, for a copy installed as an app
+      // (Safari's Add to Home Screen or Add to Dock, Chrome's Install). There
+      // the emailed link would open in the browser, which on iOS and macOS
+      // has its own cookies, and the installed copy would stay signed out.
+      // The web app asks for a code instead of a link when it's running
+      // installed (web/src/installed.ts, web/src/components/SignIn.tsx).
+      emailOTP({
+        otpLength: 6,
+        expiresIn: SIGN_IN_CODE_TTL_SECONDS,
+        allowedAttempts: 5,
+        sendVerificationOTP: async ({ email, otp, type }) => {
+          // Nothing here asks for the plugin's other kinds of code (email
+          // verification, password reset); only sign-in should ever send.
+          if (type !== "sign-in") return;
+          await sendEmail(env, {
+            to: email,
+            subject: `${otp} is your Lechuga sign-in code`,
+            text: [
+              "Your code to sign in to Lechuga:",
+              "",
+              otp,
+              "",
+              "It works once and expires in 10 minutes. If you didn't ask for it, ignore this email.",
             ].join("\n"),
           });
         },

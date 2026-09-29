@@ -87,6 +87,32 @@ export function HelpPage({ me }: Props) {
         </ol>
       </section>
 
+      <section id="install" className="help-section">
+        <h2 className="help-section-title">On your phone or desktop</h2>
+        <p>
+          Lechuga can sit on your home screen or in your Dock like any other app. There's nothing to download from a
+          store: it's the same site, the same account and the same chats, in a window of its own.
+        </p>
+        <dl className="help-faq">
+          <div>
+            <dt>iPhone and iPad</dt>
+            <dd>Open lechuga.ai in Safari, tap the share button, then Add to Home Screen.</dd>
+          </div>
+          <div>
+            <dt>Mac</dt>
+            <dd>In Safari, choose Add to Dock from the File menu. In Chrome, click the install icon at the right end of the address bar.</dd>
+          </div>
+          <div>
+            <dt>Android</dt>
+            <dd>Open lechuga.ai in Chrome, open its menu, and choose Install app (on some phones it says Add to Home screen).</dd>
+          </div>
+          <div>
+            <dt>Signing in there</dt>
+            <dd>The installed app emails you a six-digit code instead of a link, because a link would open in the browser, and the browser and the app don't share a sign-in.</dd>
+          </div>
+        </dl>
+      </section>
+
       <section id="feedback" className="help-section">
         <h2 className="help-section-title">Feedback</h2>
         <p>Something wrong, confusing, or worth telling us? This goes straight to us, not a form that vanishes.</p>

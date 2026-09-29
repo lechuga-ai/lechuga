@@ -12,6 +12,7 @@ import { SettingsPage } from "./routes/SettingsPage";
 import { WelcomePage } from "./routes/WelcomePage";
 import { authClient } from "./auth";
 import { getMe, type Me } from "./api";
+import { clearToken } from "./native";
 
 // Session gate and the top of the routing. It only decides what to show: the
 // worker enforces sign-in with a 401 on every private /api route.
@@ -82,6 +83,8 @@ export default function Root() {
             me={me}
             onSignOut={async () => {
               await authClient.signOut();
+              // The native app's copy of the session token (a no-op on the web).
+              clearToken();
             }}
           />
         }

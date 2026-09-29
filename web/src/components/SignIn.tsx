@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { authClient } from "../auth";
+import { isInstalledApp } from "../installed";
+import { NATIVE } from "../native";
 import { getAuthConfig, lookupInvite, requestAccess, type AuthConfig } from "../api";
 
-type View = "signin" | "sent" | "invite-only" | "requested";
+// sent: a link is on its way (browser). code: a code is, and there is a field
+// for it (installed app).
+type View = "signin" | "sent" | "code" | "invite-only" | "requested";
 
 type CardProps = {
   // Where Better Auth sends the user after the magic link or Google
@@ -21,6 +25,12 @@ type CardProps = {
 const BLOCKED_MESSAGE =
   "the sign-in check couldn't load. An ad blocker or privacy extension may be blocking challenges.cloudflare.com; allow it for this site and reload.";
 
+// Installed (home screen, Dock), the emailed link would open in the browser,
+// which on iOS and macOS has its own cookies, and this copy would stay signed
+// out. So installed copies are emailed a code to type here instead. Fixed for
+// the life of the page: it can't change without a relaunch.
+const INSTALLED = isInstalledApp();
+
 // The sign-in card: email field, Google, and the request-access form for
 // people without an invite. One Turnstile widget serves both forms; it stays
 // mounted at the bottom of the card while the forms above it swap. Used as an
@@ -29,6 +39,7 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
   const [config, setConfig] = useState<AuthConfig | null>(null);
   const [view, setView] = useState<View>(startOnRequest ? "invite-only" : "signin");
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
   const [emailLocked, setEmailLocked] = useState(false);
   const [inviteNote, setInviteNote] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -73,9 +84,11 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
   }, [inviteToken]);
 
   // Turnstile's script loads asynchronously; poll briefly until it's there,
-  // then render once. The token is sent as a header the worker checks.
+  // then render once. The token is sent as a header the worker checks. Not
+  // in the native app: Turnstile only runs on http(s) pages and the app's
+  // aren't, so the worker lets the app's origins through without it.
   useEffect(() => {
-    if (!config || !widgetHost.current || widgetId.current) return;
+    if (NATIVE || !config || !widgetHost.current || widgetId.current) return;
     let cancelled = false;
     const startedAt = Date.now();
     const render = () => {
@@ -98,9 +111,9 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
           setError(null);
         },
         "expired-callback": () => setCaptcha(null),
-        "error-callback": () => {
+        "error-callback": (code) => {
           setCaptcha(null);
-          setError("the sign-in check failed; reload the page to try again.");
+          setError(`the sign-in check failed${code ? ` (code ${code})` : ""}; reload the page to try again.`);
         },
       });
     };
@@ -112,10 +125,13 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
 
   function resetCaptcha() {
     setCaptcha(null);
-    window.turnstile?.reset(widgetId.current ?? undefined);
+    if (widgetId.current) window.turnstile?.reset(widgetId.current);
   }
 
+  // The token to send, or null when the form must wait. Inside the native
+  // app there is no widget and the worker doesn't ask for a token, so "".
   function needCaptcha(): string | null {
+    if (NATIVE) return "";
     if (captcha) return captcha;
     setError(captchaBlocked ? BLOCKED_MESSAGE : "one moment, the bot check hasn't finished");
     return null;
@@ -126,17 +142,27 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
     const address = email.trim();
     if (!address) return;
     const token = needCaptcha();
-    if (!token) return;
+    if (token === null) return;
     setBusy(true);
     setError(null);
-    const { error: err } = await authClient.signIn.magicLink({
-      email: address,
-      callbackURL,
-      // A refused sign-in comes back to the home page, which reopens this
-      // card on the invite-only view.
-      errorCallbackURL: "/",
-      fetchOptions: { headers: { "x-captcha-response": token } },
-    });
+    const fetchOptions = { headers: { "x-captcha-response": token } };
+    // Both paths go through the same invite gate and bot check on the worker.
+    let err: { code?: string; message?: string } | null;
+    try {
+      ({ error: err } = INSTALLED
+        ? await authClient.emailOtp.sendVerificationOtp({ email: address, type: "sign-in", fetchOptions })
+        : await authClient.signIn.magicLink({
+            email: address,
+            callbackURL,
+            // A refused sign-in comes back to the home page, which reopens
+            // this card on the invite-only view.
+            errorCallbackURL: "/",
+            fetchOptions,
+          }));
+    } catch (thrown) {
+      // Never leave the button on "sending…": say what went wrong instead.
+      err = { message: (thrown as Error).message || String(thrown) };
+    }
     setBusy(false);
     resetCaptcha();
     if (err) {
@@ -144,10 +170,39 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
         setView("invite-only");
         return;
       }
-      setError(err.message || "couldn't send the link, try again");
+      setError(err.message || `couldn't send the ${INSTALLED ? "code" : "link"}, try again`);
       return;
     }
-    setView("sent");
+    setCode("");
+    setView(INSTALLED ? "code" : "sent");
+  }
+
+  // The installed copy's second step: the code from the email. On success the
+  // session cookie is set, and a plain load of callbackURL lands signed in,
+  // where the link would have.
+  async function enterCode(e: FormEvent) {
+    e.preventDefault();
+    const otp = code.trim();
+    if (otp.length < 6) return;
+    setBusy(true);
+    setError(null);
+    let err: { code?: string; message?: string } | null;
+    try {
+      ({ error: err } = await authClient.signIn.emailOtp({ email: email.trim(), otp }));
+    } catch (thrown) {
+      err = { message: (thrown as Error).message || String(thrown) };
+    }
+    if (err) {
+      setBusy(false);
+      const messages: Record<string, string> = {
+        INVALID_OTP: "that code isn't right; check the email and try again",
+        OTP_EXPIRED: "that code has expired; send yourself a new one",
+        TOO_MANY_ATTEMPTS: "too many tries; send yourself a new code",
+      };
+      setError(messages[err.code ?? ""] ?? err.message ?? "couldn't sign you in, try again");
+      return;
+    }
+    window.location.assign(callbackURL);
   }
 
   async function signInWithGoogle() {
@@ -161,7 +216,7 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
     const address = email.trim();
     if (!address) return;
     const token = needCaptcha();
-    if (!token) return;
+    if (token === null) return;
     setBusy(true);
     setError(null);
     try {
@@ -175,7 +230,7 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
     }
   }
 
-  const showWidget = view === "signin" || view === "invite-only";
+  const showWidget = !NATIVE && (view === "signin" || view === "invite-only");
 
   return (
     <div className="signin">
@@ -196,6 +251,49 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
             use a different email
           </button>
         </div>
+      )}
+
+      {view === "code" && (
+        <form className="signin-form" onSubmit={enterCode}>
+          <p className="signin-lead">
+            Check <strong>{email.trim()}</strong> for a six-digit code from hello@lechuga.ai and type it here.
+          </p>
+          <label className="signin-label" htmlFor="signin-code">
+            Code
+          </label>
+          <div className="signin-row">
+            <input
+              id="signin-code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9]*"
+              maxLength={6}
+              required
+              placeholder="123456"
+              value={code}
+              onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+              disabled={busy}
+              autoFocus
+            />
+            <button type="submit" disabled={busy || code.trim().length < 6}>
+              {busy ? "checking…" : "sign in"}
+            </button>
+          </div>
+          <p className="signin-hint">
+            It works once and expires in 10 minutes. Look in spam if it's slow.{" "}
+            <button
+              type="button"
+              className="signin-link"
+              onClick={() => {
+                setCode("");
+                setError(null);
+                setView("signin");
+              }}
+            >
+              send another
+            </button>
+          </p>
+        </form>
       )}
 
       {view === "requested" && (
@@ -228,10 +326,12 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
               disabled={busy}
             />
             <button type="submit" disabled={busy || !config || captchaBlocked}>
-              {busy ? "sending…" : "send link"}
+              {busy ? "sending…" : INSTALLED ? "send code" : "send link"}
             </button>
           </div>
-          {config?.googleSignIn && (
+          {/* Not in the native app yet: Google refuses its sign-in page inside
+              an app's web view, so that needs Google's native SDK first. */}
+          {config?.googleSignIn && !NATIVE && (
             <>
               <div className="signin-or">or</div>
               <button type="button" className="signin-google" onClick={signInWithGoogle}>
