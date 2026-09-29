@@ -3,8 +3,8 @@ import type { AppEnv, Env } from "./types";
 import type { ToolDef } from "./tools";
 import config from "../config.json";
 
-// Memory: what Lechuga keeps about a person across their chats (migration
-// 0011). Two short documents per person:
+// Memory: what Lechuga keeps about a person across their chats (migrations
+// 0011 and 0012). Two short documents per person:
 //
 //   notes  what to remember: who they are, what they're working on, lasting
 //          preferences. Facts and context, a line each.

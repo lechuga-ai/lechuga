@@ -8,9 +8,8 @@
 --   soul     how to be with them: tone, length, manner. Same sources.
 --   enabled  0 turns it off without losing it: nothing is sent to the model
 --            and nothing new is written.
---   nightly  1 lets the overnight pass (nightly.ts) read the day's private
---            chats and fold what's lasting into both. trained_at is when it
---            last did, so each pass starts where the previous one ended.
+--
+-- The overnight pass's two columns came after this ran (0012).
 --
 -- Both documents go into the system prompt of the person's private chats
 -- only (chat.ts), never a shared one, since anyone in a shared chat can get
@@ -24,7 +23,5 @@ CREATE TABLE memory (
   notes TEXT NOT NULL DEFAULT '',
   soul TEXT NOT NULL DEFAULT '',
   enabled INTEGER NOT NULL DEFAULT 1,
-  nightly INTEGER NOT NULL DEFAULT 1,
-  trained_at INTEGER,
   updated_at INTEGER NOT NULL
 );

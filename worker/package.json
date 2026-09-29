@@ -41,6 +41,9 @@
     "db:migrate:local:0011": "wrangler d1 execute lechuga-dev --local --file=src/db/0011_memory.sql",
     "db:migrate:dev:0011": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0011_memory.sql",
     "db:migrate:prod:0011": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0011_memory.sql",
+    "db:migrate:local:0012": "wrangler d1 execute lechuga-dev --local --file=src/db/0012_memory_nightly.sql",
+    "db:migrate:dev:0012": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0012_memory_nightly.sql",
+    "db:migrate:prod:0012": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0012_memory_nightly.sql",
     "db:check:local": "wrangler d1 execute lechuga-dev --local --file=src/db/check_balances.sql",
     "db:check:dev": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/check_balances.sql",
     "db:check:prod": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/check_balances.sql"
