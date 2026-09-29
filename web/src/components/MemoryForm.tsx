@@ -11,7 +11,6 @@ const MAX = config.limits.memory_chars;
 export function MemoryForm() {
   const [memory, setMemory] = useState<Memory | null>(null);
   const [notes, setNotes] = useState("");
-  const [soul, setSoul] = useState("");
   const [enabled, setEnabled] = useState(true);
   const [nightly, setNightly] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -25,7 +24,6 @@ export function MemoryForm() {
         if (cancelled) return;
         setMemory(m);
         setNotes(m.notes);
-        setSoul(m.soul);
         setEnabled(m.enabled);
         setNightly(m.nightly);
       })
@@ -35,9 +33,9 @@ export function MemoryForm() {
     };
   }, []);
 
-  const changed = memory !== null && (notes !== memory.notes || soul !== memory.soul || enabled !== memory.enabled || nightly !== memory.nightly);
+  const changed = memory !== null && (notes !== memory.notes || enabled !== memory.enabled || nightly !== memory.nightly);
 
-  async function save(next: { notes: string; soul: string; enabled: boolean; nightly: boolean }) {
+  async function save(next: { notes: string; enabled: boolean; nightly: boolean }) {
     setBusy(true);
     setError(null);
     setSaved(false);
@@ -45,7 +43,6 @@ export function MemoryForm() {
       const m = await saveMemory(next);
       setMemory(m);
       setNotes(m.notes);
-      setSoul(m.soul);
       setEnabled(m.enabled);
       setNightly(m.nightly);
       setSaved(true);
@@ -59,26 +56,26 @@ export function MemoryForm() {
   function submit(e: FormEvent) {
     e.preventDefault();
     if (!changed || busy) return;
-    void save({ notes, soul, enabled, nightly });
+    void save({ notes, enabled, nightly });
   }
 
   function forget() {
     if (!window.confirm("Forget everything Lechuga remembers about you? This can't be undone.")) return;
-    void save({ notes: "", soul: "", enabled, nightly });
+    void save({ notes: "", enabled, nightly });
   }
 
-  const empty = memory !== null && !memory.notes && !memory.soul;
+  const empty = memory !== null && !memory.notes;
   const when = memory?.updatedAt ? new Date(memory.updatedAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : null;
 
   return (
     <section className="settings-panel">
       <p>
-        Lechuga can carry a little about you from one chat to the next: what you're working on, what you like, how you'd like it to answer. It's
-        kept here in two short notes, which you can rewrite or wipe. They are sent with every message in your own chats, and never in a chat you've
-        shared, so each costs a few credits a message while they're not empty.
+        Your bots can carry a little about you from one chat to the next: what you're working on, what you like. It's kept here as one short
+        note, which you can rewrite or wipe. It's sent with every message in your own chats, and never in a chat you've shared, so it costs a few
+        credits a message while it's not empty. How each bot talks is set on the bot's own page, not here.
       </p>
       <p>
-        Four things write to them: pressing <b>Remember</b> in a chat, which has Lechuga fold that chat in; telling Lechuga in a chat to remember
+        Four things write to it: pressing <b>Remember</b> in a chat, which has the bot fold that chat in; telling a bot in a chat to remember
         something; an overnight pass that reads the day's chats and keeps only what's clearly lasting, charged like one message; and you, here.
       </p>
       {memory === null ? (
@@ -105,20 +102,7 @@ export function MemoryForm() {
             disabled={busy}
           />
           <p className="settings-count">
-            {notes.length.toLocaleString()} of {MAX.toLocaleString()} characters
-          </p>
-          <label htmlFor="memory-soul">How Lechuga should talk to you</label>
-          <textarea
-            id="memory-soul"
-            value={soul}
-            maxLength={MAX}
-            rows={5}
-            placeholder={empty ? "Tone, length, format. For example: short answers, no bullet points, and tell me plainly when I'm wrong." : ""}
-            onChange={(e) => setSoul(e.target.value)}
-            disabled={busy}
-          />
-          <p className="settings-count">
-            {soul.length.toLocaleString()} of {MAX.toLocaleString()} characters{when ? `. Last changed ${when}.` : ""}
+            {notes.length.toLocaleString()} of {MAX.toLocaleString()} characters{when ? `. Last changed ${when}.` : ""}
           </p>
           {error && <p className="modal-error">{error}</p>}
           <div className="modal-actions">

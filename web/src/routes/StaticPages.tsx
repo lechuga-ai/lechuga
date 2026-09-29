@@ -84,6 +84,30 @@ type NewsEntry = { date: string; title: string; intro: string; items: { lead: st
 
 const NEWS: NewsEntry[] = [
   {
+    date: "September 29, 2026",
+    title: "Bots",
+    intro:
+      "Until now there was one Lechuga, and every chat was with it. Now there are bots: you make them, name them, and tell them what they're for. Every chat is with one of them.",
+    items: [
+      {
+        lead: "Seed.",
+        text: "The bot every account starts with. All your chats so far are with it, and whatever you'd written about how Lechuga should talk to you is now how Seed behaves. It's the one that can't be deleted.",
+      },
+      {
+        lead: "Name one and it knows what it's for.",
+        text: "New bot, in the list on the left, asks for a name and nothing else. Lechuga writes a first draft of how the bot should behave from the name alone (try Penny Pincher, or Sous Chef), and opens its page so you can rewrite it. A bot can have its own model for new chats, too.",
+      },
+      {
+        lead: "One list, one bot at a time.",
+        text: "Pick a bot on the left and the chat list is that bot's chats; New chat starts one with it. Chats people have shared with you sit underneath whichever bot you're on. The pencil beside a bot opens its page.",
+      },
+      {
+        lead: "Memory is yours; the soul is the bot's.",
+        text: "What Lechuga remembers about you stays one note under Account, shared by all your bots. How a bot behaves lives on the bot's page. Remember, in a chat, still updates both; the overnight pass now touches only the note about you.",
+      },
+    ],
+  },
+  {
     date: "September 28, 2026",
     title: "Lechuga remembers",
     intro:

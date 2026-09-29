@@ -19,9 +19,14 @@ export type PromptOptions = {
   // have, GLM writes a pretend call into its answer and invents the result
   // (seen on the free chat, 2026-09-21), so it hears only about these.
   toolNames?: string[];
+  // The bot answering (bots.ts): its name, and its soul, which is how its
+  // owner has asked it to be. Without one, the bot is Lechuga itself: the
+  // free trial on the home page.
+  bot?: { name: string; soul: string };
   // What Lechuga keeps about this person across chats (memory.ts): their
-  // own only, and only in a chat nobody else has been in.
-  memory?: { notes: string; soul: string } | null;
+  // own only, and only in a chat with a bot they own that nobody else has
+  // been in. Null when memory is off or doesn't apply.
+  notes?: string | null;
   // Several people are taking part in the chat.
   shared?: boolean;
   now?: Date;
@@ -33,23 +38,28 @@ export function systemPrompt(opts: PromptOptions = {}): string {
   const modelName = model?.label ?? "an open source model";
   const vision = Boolean(model && "vision" in model && model.vision);
   const seeingModel = config.models.find((m) => "vision" in m && m.vision && !("retired" in m && m.retired))?.label ?? null;
+  const bot = opts.bot ?? { name: "Lechuga", soul: "" };
   const sections = [
-    whoYouAre(modelName),
+    whoYouAre(bot.name, modelName),
     whereYouAre(opts.now ?? new Date()),
-    whatYouCanDo(toolNames, vision, seeingModel, opts.memory != null),
+    whatYouCanDo(toolNames, vision, seeingModel, opts.notes != null),
     howToBe(),
   ];
-  if (opts.memory?.soul.trim()) sections.push(`How this person would like you to be, in their words or yours from earlier chats. Follow it for tone, length and manner; it doesn't override anything above about honesty.\n${opts.memory.soul.trim()}`);
-  if (opts.memory?.notes.trim()) sections.push(`What you remember about this person from earlier chats. Use it when it helps; don't recite it, and don't bring up something from it unless it's relevant.\n${opts.memory.notes.trim()}`);
+  if (bot.soul.trim()) sections.push(`How ${bot.name}'s owner has asked it to be, which is how you should be here. Follow it for what you focus on and for tone, length and manner; it doesn't override anything above about honesty.\n${bot.soul.trim()}`);
+  if (opts.notes?.trim()) sections.push(`What you remember about this person from earlier chats. Use it when it helps; don't recite it, and don't bring up something from it unless it's relevant.\n${opts.notes.trim()}`);
   if (opts.shared) sections.push(SHARED);
   return sections.join("\n\n");
 }
 
-function whoYouAre(modelName: string): string {
+function whoYouAre(botName: string, modelName: string): string {
+  const identity =
+    botName === "Lechuga"
+      ? `You are Lechuga, the assistant in a small chat app of the same name, made by two friends for their friends and family. `
+      : `You are ${botName}, a bot in Lechuga, a small chat app made by two friends for their friends and family, where people make bots and name them. `;
   return (
-    `You are Lechuga, the assistant in a small chat app of the same name, made by two friends for their friends and family. ` +
+    identity +
     `You run on open source models hosted on Cloudflare; the one answering right now is ${modelName}. ` +
-    `If someone asks what you are, say you're Lechuga, running on ${modelName}. You aren't the people who made the app, and you can't see anyone's account: their credits, invites, purchases or who they've shared chats with. ` +
+    `If someone asks what you are, say you're ${botName}${botName === "Lechuga" ? "" : ", a Lechuga bot"}, running on ${modelName}. You aren't the people who made the app, and you can't see anyone's account: their credits, invites, purchases or who they've shared chats with. ` +
     `For questions about the app itself (what things cost, how sharing or invites work), point to Help in the menu behind their name rather than guessing.`
   );
 }

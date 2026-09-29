@@ -9,6 +9,7 @@ import { WhatsNewPage } from "./routes/StaticPages";
 import { HelpPage } from "./routes/HelpPage";
 import { GettingStartedPage } from "./routes/GettingStartedPage";
 import { SettingsPage } from "./routes/SettingsPage";
+import { BotPage } from "./routes/BotPage";
 import { WelcomePage } from "./routes/WelcomePage";
 import { authClient } from "./auth";
 import { getMe, type Me } from "./api";
@@ -71,6 +72,7 @@ export default function Root() {
       <Route path="/settings" element={<SettingsPage me={me} onMeChange={setMe} />} />
       <Route path="/settings/credits" element={<SettingsPage me={me} onMeChange={setMe} />} />
       <Route path="/settings/memory" element={<SettingsPage me={me} onMeChange={setMe} />} />
+      <Route path="/bots/:id" element={<BotPage />} />
       <Route path="/admin" element={me.isAdmin ? <Admin me={me} /> : <Navigate to="/" replace />} />
       {/* Where credits lived before Settings, and where older Stripe sessions
           send people back to. The query string (?checkout=success) rides

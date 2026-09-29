@@ -215,6 +215,94 @@ button {
   display: block;
 }
 
+/* The bots, one row each above the chat list. The selected one is the
+   chats shown below and the one a new chat starts with. */
+.bot-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.bot-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: #5f6659;
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.bot-chip:hover,
+.bot-chip.active {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1e221b;
+}
+
+.bot-chip.active .bot-chip-name {
+  font-weight: 600;
+}
+
+.bot-chip-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bot-chip-edit {
+  visibility: hidden;
+  color: #98a092;
+  text-decoration: none;
+  font-size: 13px;
+  padding: 0 2px;
+}
+
+.bot-chip:hover .bot-chip-edit,
+.bot-chip.active .bot-chip-edit {
+  visibility: visible;
+}
+
+.bot-chip-edit:hover {
+  color: #1e221b;
+}
+
+.bot-chip-new {
+  color: #7c8476;
+}
+
+.bot-chip-plus {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px dashed #98a092;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* The "Shared with me" line, above the first chat that isn't mine. */
+.chat-list-label {
+  flex-basis: 100%;
+  margin: 8px 0 2px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #98a092;
+  cursor: default;
+}
+
 .new-chat-btn {
   background: var(--accent);
   color: #ffffff;
@@ -4079,6 +4167,17 @@ button {
 .settings-form textarea:focus {
   outline: none;
   border-color: rgba(111, 174, 59, 0.6);
+}
+
+.settings-form .settings-select {
+  display: block;
+  max-width: 360px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
 }
 
 .settings-form .settings-check {

@@ -2,6 +2,7 @@ import { runReply } from "./reply";
 import { toolsFor } from "./tools";
 import { systemPrompt } from "./prompt";
 import { loadMemory, parseRemembered, rememberRequest, rememberTool, saveMemory } from "./memory";
+import { botFor, defaultBot, myBot } from "./bots";
 import { Hono } from "hono";
 import type { AppEnv, Env, ChatRow, MessageRow } from "./types";
 import { streamChat, collectText, type ChatTurn } from "./gateway";
@@ -125,18 +126,23 @@ chat.get("/chats/search", async (c) => {
   return c.json(matches);
 });
 
+// A new chat, with one of my bots (bots.ts): the one asked for, or Seed.
+// The model is the one asked for, else the bot's, else the default; the
+// chat keeps it from here on.
 chat.post("/chats", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const model = MODEL_IDS.has(body?.model) ? body.model : DEFAULT_MODEL;
+  const userId = c.get("userId");
+  const bot = (typeof body?.bot === "string" && (await myBot(c.env, userId, body.bot))) || (await defaultBot(c.env, userId));
+  const model = MODEL_IDS.has(body?.model) ? body.model : bot.model && MODEL_IDS.has(bot.model) ? bot.model : DEFAULT_MODEL;
 
   const id = crypto.randomUUID();
   const now = Date.now();
   await c.env.DB.prepare(
-    "INSERT INTO chats (id, user_id, title, model, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, ?)"
+    "INSERT INTO chats (id, user_id, bot_id, title, model, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?)"
   )
-    .bind(id, c.get("userId"), model, now, now)
+    .bind(id, userId, bot.id, model, now, now)
     .run();
-  return c.json({ id });
+  return c.json({ id, bot: bot.id });
 });
 
 // Brings the home page's free trial chat into a new account as its first
@@ -156,10 +162,12 @@ chat.post("/chats/import", async (c) => {
 
   const id = crypto.randomUUID();
   const now = Date.now();
+  const seed = await defaultBot(c.env, c.get("userId"));
   await c.env.DB.batch([
-    c.env.DB.prepare("INSERT INTO chats (id, user_id, title, model, created_at, updated_at) VALUES (?, ?, NULL, ?, ?, ?)").bind(
+    c.env.DB.prepare("INSERT INTO chats (id, user_id, bot_id, title, model, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?)").bind(
       id,
       c.get("userId"),
+      seed.id,
       DEFAULT_MODEL,
       now,
       now
@@ -190,11 +198,13 @@ chat.get("/chats/:id", async (c) => {
   const access = await chatAccess(c.env, chatId, c.get("userId"));
   if (!access) return c.json({ error: "not found" }, 404);
 
-  const [{ results }, people] = await Promise.all([
+  const [{ results }, people, bot] = await Promise.all([
     c.env.DB.prepare("SELECT * FROM messages WHERE chat_id = ? ORDER BY created_at ASC").bind(chatId).all<MessageRow>(),
     roster(c.env, access.chat, access.role === "owner"),
+    botFor(c.env, access.chat),
   ]);
-  return c.json({ chat: access.chat, messages: results, role: access.role, roster: people });
+  // Of the bot, only what anyone in the chat may see: its soul is its owner's.
+  return c.json({ chat: access.chat, messages: results, role: access.role, roster: people, bot: { id: bot.id, name: bot.name } });
 });
 
 // Deleting is the owner's, and takes the chat away from everyone in it. A
@@ -302,10 +312,11 @@ chat.post("/chats/:id/messages", async (c) => {
     .all<Turn>();
   // After a "compact this chat", only the summary and what came after it.
   const { kept: history, dropped } = trimHistory(sinceLastSummary(fullHistory));
-  const names = await speakerNames(c.env, chatRow);
+  const [names, bot] = await Promise.all([speakerNames(c.env, chatRow), botFor(c.env, chatRow)]);
   // What Lechuga remembers about the person (memory.ts) goes in only when
   // nobody else has ever been in the chat, so names is null and the typist
-  // is the owner. With it comes the tool that adds to it.
+  // is the owner, of the chat and so of its bot. With it comes the tool
+  // that adds to it.
   const memory = names ? null : await loadMemory(c.env, userId);
   const withMemory = memory !== null && memory.enabled;
 
@@ -313,7 +324,7 @@ chat.post("/chats/:id/messages", async (c) => {
     ? "This chat has grown long, so only its most recent part was sent to the model. Start a new chat if it loses the thread."
     : undefined;
   const tools = withMemory ? [...toolsFor(c.env), rememberTool(userId)] : toolsFor(c.env);
-  const reply = runReply(c.env, chatRow.model, forModel(history, names, { model: chatRow.model, toolNames: tools.map((t) => t.name), memory: withMemory ? memory : null }), {
+  const reply = runReply(c.env, chatRow.model, forModel(history, names, { model: chatRow.model, toolNames: tools.map((t) => t.name), bot, notes: withMemory ? memory.notes : null }), {
     maxTokens: LIMITS.max_reply_tokens,
     effort,
     tools,
@@ -388,13 +399,13 @@ async function speakerNames(env: Env, chatRow: ChatRow): Promise<Map<string, str
 }
 
 // Stored messages, as the model should see them: first the system prompt
-// (prompt.ts), then pictures as image parts, a compaction summary as a
-// system message that explains what it is, and in a shared chat, each
-// person's turn marked with their name.
+// (prompt.ts) for the chat's bot, then pictures as image parts, a
+// compaction summary as a system message that explains what it is, and in
+// a shared chat, each person's turn marked with their name.
 function forModel(
   history: Turn[],
   names: Map<string, string> | null,
-  opts: { model: string; toolNames?: string[]; memory?: { notes: string; soul: string } | null }
+  opts: { model: string; toolNames?: string[]; bot: { name: string; soul: string }; notes?: string | null }
 ): ChatTurn[] {
   const tagged = (m: Turn): string | ContentPart[] => {
     const content = modelContent(m.content);
@@ -409,7 +420,7 @@ function forModel(
         ? { role: "system", content: SUMMARY_PREAMBLE + summaryText(m.content) }
         : { role: "assistant", content: m.content }
   );
-  const system = systemPrompt({ model: opts.model, toolNames: opts.toolNames, memory: opts.memory, shared: names !== null });
+  const system = systemPrompt({ model: opts.model, toolNames: opts.toolNames, bot: { name: opts.bot.name, soul: opts.bot.soul }, notes: opts.notes, shared: names !== null });
   return [{ role: "system", content: system }, ...turns];
 }
 
@@ -440,7 +451,7 @@ chat.post("/chats/:id/compact", async (c) => {
 
   let upstream;
   try {
-    upstream = await streamChat(c.env, chatRow.model, [...forModel(history, await speakerNames(c.env, chatRow), { model: chatRow.model }), { role: "user", content: SUMMARY_REQUEST }], {
+    upstream = await streamChat(c.env, chatRow.model, [...forModel(history, await speakerNames(c.env, chatRow), { model: chatRow.model, bot: await botFor(c.env, chatRow) }), { role: "user", content: SUMMARY_REQUEST }], {
       maxTokens: LIMITS.summary_tokens,
       effort: "low",
     });
@@ -478,11 +489,11 @@ chat.post("/chats/:id/compact", async (c) => {
 });
 
 // "Remember this chat". The model reads the chat as it would have been sent
-// anyway, plus what it already keeps about the person, and writes both
-// memory documents afresh with this chat folded in (memory.ts). Nothing is
-// added to the chat; the result lives under Account > Memory. Charged like
-// a reply, once, and only from a chat nobody else has ever been in, since
-// the memory it writes is the owner's alone.
+// anyway, plus what it already keeps about the person and the bot's soul,
+// and writes both afresh with this chat folded in (memory.ts). Nothing is
+// added to the chat; the notes live under Account > Memory and the soul on
+// the bot's page. Charged like a reply, once, and only from a chat nobody
+// else has ever been in, since what it writes is the owner's alone.
 chat.post("/chats/:id/remember", async (c) => {
   const chatId = c.req.param("id");
   const userId = c.get("userId");
@@ -492,7 +503,7 @@ chat.post("/chats/:id/remember", async (c) => {
   const chatRow = access.chat;
   if ((await speakerNames(c.env, chatRow)) !== null) return c.json({ error: "a shared chat can't go into your memory" }, 403);
 
-  const [account, recent, memory] = await Promise.all([accountState(c.env, userId), recentActivity(c.env, userId, userId), loadMemory(c.env, userId)]);
+  const [account, recent, memory, bot] = await Promise.all([accountState(c.env, userId), recentActivity(c.env, userId, userId), loadMemory(c.env, userId), botFor(c.env, chatRow)]);
   if (account.suspended) return c.json({ error: "this account is suspended", code: "suspended" }, 403);
   if (recent.inFlight > 0) return c.json({ error: "a reply is still being written. Wait for it to finish, then try again." }, 429);
   if (creditsEnforced(c.env) && account.balance <= 0) return c.json({ error: "you're out of lettuce", code: "out_of_credits" }, 402);
@@ -506,7 +517,8 @@ chat.post("/chats/:id/remember", async (c) => {
 
   let upstream;
   try {
-    upstream = await streamChat(c.env, chatRow.model, [...forModel(history, null, { model: chatRow.model, memory }), { role: "user", content: rememberRequest(memory) }], {
+    const current = { notes: memory.notes, soul: bot.soul };
+    upstream = await streamChat(c.env, chatRow.model, [...forModel(history, null, { model: chatRow.model, bot, notes: memory.notes }), { role: "user", content: rememberRequest(current) }], {
       maxTokens: LIMITS.remember_tokens,
       effort: "low",
     });
@@ -536,8 +548,12 @@ chat.post("/chats/:id/remember", async (c) => {
       note: "remember",
     })
   );
-  const saved = await saveMemory(c.env, userId, parseRemembered(written, memory));
-  return c.json({ ok: true, credits, memory: saved });
+  const remembered = parseRemembered(written, { notes: memory.notes, soul: bot.soul });
+  const [saved] = await Promise.all([
+    saveMemory(c.env, userId, { notes: remembered.notes }),
+    c.env.DB.prepare("UPDATE bots SET soul = ?, updated_at = ? WHERE id = ?").bind(remembered.soul, Date.now(), bot.id).run(),
+  ]);
+  return c.json({ ok: true, credits, memory: saved, soul: remembered.soul });
 });
 
 async function generateTitle(env: Env, chatId: string, firstMessage: string) {

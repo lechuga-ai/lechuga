@@ -17,6 +17,8 @@ export type Chat = {
   id: string;
   // The owner, who pays for the chat's replies.
   user_id: string;
+  // The bot it's with (null only on a chat from before bots: the owner's Seed).
+  bot_id: string | null;
   title: string | null;
   model: string;
   created_at: number;
@@ -129,18 +131,55 @@ export async function searchChats(q: string): Promise<ChatHit[]> {
   return expectJson(await apiFetch(`/api/chats/search?q=${encodeURIComponent(q)}`));
 }
 
-export async function createChat(model?: string): Promise<{ id: string }> {
+// A new chat with one of my bots (Seed if none is given). The model asked
+// for wins; otherwise the bot's; otherwise the default.
+export async function createChat(model?: string, bot?: string): Promise<{ id: string; bot: string }> {
   return expectJson(
     await apiFetch("/api/chats", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ model }),
+      body: JSON.stringify({ model, bot }),
     })
   );
 }
 
-export async function getChat(id: string): Promise<{ chat: Chat; messages: Message[]; role: "owner" | "member"; roster: Roster }> {
+export async function getChat(id: string): Promise<{ chat: Chat; messages: Message[]; role: "owner" | "member"; roster: Roster; bot: { id: string; name: string } }> {
   return expectJson(await apiFetch(`/api/chats/${id}`));
+}
+
+// Bots (worker/src/bots.ts): a name, a soul, a model, all mine. Seed is the
+// one every account has (is_default).
+export type Bot = {
+  id: string;
+  user_id: string;
+  name: string;
+  soul: string;
+  model: string | null;
+  is_default: number;
+  created_at: number;
+  updated_at: number;
+};
+
+export async function listBots(): Promise<Bot[]> {
+  return expectJson(await apiFetch("/api/bots"));
+}
+
+// Takes a few seconds: the worker has the model draft a soul from the name.
+export async function createBot(name: string): Promise<Bot> {
+  return expectJson(await postJson("/api/bots", { name }));
+}
+
+export async function getBot(id: string): Promise<Bot> {
+  return expectJson(await apiFetch(`/api/bots/${id}`));
+}
+
+export async function saveBot(id: string, patch: { name?: string; soul?: string; model?: string | null }): Promise<Bot> {
+  return expectJson(await postJson(`/api/bots/${id}`, patch, "PUT"));
+}
+
+// Its chats move to Seed, whose id comes back.
+export async function deleteBot(id: string): Promise<{ movedTo: string }> {
+  return expectJson(await apiFetch(`/api/bots/${id}`, { method: "DELETE" }));
 }
 
 // Share a chat with a username or an email address. An address with no
@@ -272,10 +311,10 @@ export async function getMe(): Promise<Me> {
 
 // photo: a small square JPEG data URL, null to remove it, undefined to keep it.
 // Account > Memory (worker/src/memory.ts): what Lechuga keeps about you
-// across your own chats, and whether it's used.
+// across your own chats, and whether it's used. (How a bot talks is on the
+// bot: saveBot.)
 export type Memory = {
   notes: string;
-  soul: string;
   enabled: boolean;
   // The overnight pass may read my chats; trainedAt is when it last did.
   nightly: boolean;
@@ -287,12 +326,13 @@ export async function getMemory(): Promise<Memory> {
   return expectJson(await apiFetch("/api/memory"));
 }
 
-export async function saveMemory(memory: { notes: string; soul: string; enabled: boolean; nightly: boolean }): Promise<Memory> {
+export async function saveMemory(memory: { notes: string; enabled: boolean; nightly: boolean }): Promise<Memory> {
   return expectJson(await postJson("/api/memory", memory, "PUT"));
 }
 
-// Has Lechuga fold this chat into its memory of you. Costs about a message.
-export async function rememberChat(chatId: string): Promise<{ credits: number; memory: Memory }> {
+// Has the bot fold this chat into its memory of you and its own soul. Costs
+// about a message.
+export async function rememberChat(chatId: string): Promise<{ credits: number; memory: Memory; soul: string }> {
   return expectJson(await apiFetch(`/api/chats/${chatId}/remember`, { method: "POST" }));
 }
 

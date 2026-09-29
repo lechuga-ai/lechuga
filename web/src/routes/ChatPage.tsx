@@ -21,17 +21,20 @@ export type ChatPageProps = {
   // The model the home page used when it created the chat, shown until the
   // chat row loads.
   expectedModel: string;
+  // Likewise the bot's name, for the box, until the chat row loads.
+  expectedBotName: string;
   onFirstMessage: (chatId: string, firstMessage: string) => void;
   refreshChats: () => Promise<void>;
   // Called once a reply has been charged, so the sidebar's balance follows.
   refreshBalance: () => void;
 };
 
-export function ChatPage({ me, models, expectedModel, onFirstMessage, refreshChats, refreshBalance }: ChatPageProps) {
+export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMessage, refreshChats, refreshBalance }: ChatPageProps) {
   const { id: chatId = "" } = useParams();
   const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatModel, setChatModel] = useState(expectedModel);
+  const [botName, setBotName] = useState(expectedBotName);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [streamingReasoning, setStreamingReasoning] = useState("");
   const [streamingSteps, setStreamingSteps] = useState<Step[]>([]);
@@ -72,9 +75,10 @@ export function ChatPage({ me, models, expectedModel, onFirstMessage, refreshCha
     let cancelled = false;
     (async () => {
       try {
-        const { chat, messages: history, role: myRole, roster: people } = await getChat(chatId);
+        const { chat, messages: history, role: myRole, roster: people, bot } = await getChat(chatId);
         if (cancelled) return;
         setChatModel(chat.model);
+        setBotName(bot.name);
         setMessages(history);
         setRole(myRole);
         setRoster(people);
@@ -259,7 +263,7 @@ export function ChatPage({ me, models, expectedModel, onFirstMessage, refreshCha
     setNotice(null);
     try {
       await rememberChat(chatId);
-      setNotice("Lechuga has folded this chat into what it remembers about you. Read or change it under Account, then Memory.");
+      setNotice(`${botName} has folded this chat into what it remembers about you, and into how it behaves. Read or change them under Account, then Memory, and on the bot's page.`);
       refreshBalance();
     } catch (err) {
       setNotice((err as Error).message || "couldn't remember the chat, try again");
@@ -334,7 +338,7 @@ export function ChatPage({ me, models, expectedModel, onFirstMessage, refreshCha
         models={models}
         selectedModel={chatModel}
         modelLocked
-        placeholder="message Lechuga"
+        placeholder={`message ${botName}`}
         onSelectModel={() => {}}
         acceptsAttachments
         onSend={(content, attachments) => void send(content, attachments, messages.length === 0)}

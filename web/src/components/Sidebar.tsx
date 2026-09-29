@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { searchChats, type Chat, type ChatHit, type Me } from "../api";
+import { searchChats, type Bot, type Chat, type ChatHit, type Me } from "../api";
 import { Avatar, AvatarStack } from "./Avatar";
 import { InviteDialog } from "./InviteDialog";
+import { NewBotDialog } from "./NewBotDialog";
 import { Copyright } from "./SiteFooter";
 
 type Props = {
   chats: Chat[];
+  // My bots, Seed first; the chat list is the selected one's chats.
+  bots: Bot[];
+  selectedBotId: string | null;
+  onSelectBot: (id: string) => void;
+  onBotCreated: (bot: Bot) => void;
   activeChatId: string | null;
   open: boolean;
   onSelect: (id: string) => void;
@@ -20,7 +26,7 @@ type Props = {
   onSignOut: () => Promise<void>;
 };
 
-type Dialog = "none" | "invite";
+type Dialog = "none" | "invite" | "newBot";
 
 const SIX_DAYS = 6 * 24 * 60 * 60 * 1000;
 
@@ -41,6 +47,10 @@ function ageLabel(timestamp: number, now: number): string {
 
 export function Sidebar({
   chats,
+  bots,
+  selectedBotId,
+  onSelectBot,
+  onBotCreated,
   activeChatId,
   open,
   onSelect,
@@ -84,7 +94,14 @@ export function Sidebar({
   }, [query]);
 
   const searching = query.trim() !== "";
-  const shown: (Chat & { snippet?: string | null })[] = searching ? (hits ?? []) : chats;
+  // Mine, with the selected bot (a chat from before bots counts as Seed's);
+  // then the ones others have shared with me, whichever bot they're with.
+  // A search looks across all of them.
+  const seedId = bots.find((b) => b.is_default)?.id ?? null;
+  const mine = chats.filter((c) => c.user_id === me.id && (c.bot_id ?? seedId) === selectedBotId);
+  const sharedWithMe = chats.filter((c) => c.user_id !== me.id);
+  const shown: (Chat & { snippet?: string | null })[] = searching ? (hits ?? []) : [...mine, ...sharedWithMe];
+  const firstShared = searching ? null : sharedWithMe[0]?.id ?? null;
 
   function openDialog(d: Dialog) {
     setMenuOpen(false);
@@ -100,6 +117,29 @@ export function Sidebar({
         <span className="wordmark-text">
           Lechuga <span className="alpha" title="Early days: rough edges expected">alpha</span>
         </span>
+      </div>
+      {/* The bots, Seed first. The chat list below is the selected one's.
+          The pencil opens the bot's page; the last row makes a new one. */}
+      <div className="bot-strip" role="list" aria-label="Your bots">
+        {bots.map((bot) => (
+          <div
+            key={bot.id}
+            role="listitem"
+            className={`bot-chip ${bot.id === selectedBotId ? "active" : ""}`}
+            onClick={() => onSelectBot(bot.id)}
+            title={bot.soul ? bot.soul.slice(0, 160) : bot.name}
+          >
+            <Avatar person={{ id: bot.id, name: bot.name, username: null, photo: null }} size={22} />
+            <span className="bot-chip-name">{bot.name}</span>
+            <Link to={`/bots/${bot.id}`} className="bot-chip-edit" onClick={(e) => e.stopPropagation()} title={`${bot.name}: name, model, how it behaves`} aria-label={`Edit ${bot.name}`}>
+              ✎
+            </Link>
+          </div>
+        ))}
+        <button type="button" className="bot-chip bot-chip-new" onClick={() => openDialog("newBot")}>
+          <span className="bot-chip-plus">+</span>
+          <span className="bot-chip-name">New bot</span>
+        </button>
       </div>
       <button className="new-chat-btn" onClick={onNewChat}>
         New chat
@@ -117,12 +157,14 @@ export function Sidebar({
       />
       <div className="chat-list">
         {searching && hits !== null && hits.length === 0 && <p className="chat-list-empty">No chat has those words.</p>}
+        {!searching && mine.length === 0 && sharedWithMe.length === 0 && <p className="chat-list-empty">No chats yet with this bot.</p>}
         {shown.map((chat) => (
           <div
             key={chat.id}
             className={`chat-list-item ${chat.id === activeChatId ? "active" : ""}`}
             onClick={() => onSelect(chat.id)}
           >
+            {chat.id === firstShared && <span className="chat-list-label">Shared with me</span>}
             <span className="chat-title">{chat.title ?? "New chat"}</span>
             {chat.snippet && <span className="chat-snippet">{chat.snippet}</span>}
             {/* Shared: everyone in it, the owner ringed. */}
@@ -148,6 +190,17 @@ export function Sidebar({
           inside its 260px box. */}
       {dialog === "invite" &&
         createPortal(<InviteDialog onClose={() => setDialog("none")} onRemainingChange={setRemaining} />, document.body)}
+      {dialog === "newBot" &&
+        createPortal(
+          <NewBotDialog
+            onClose={() => setDialog("none")}
+            onCreated={(bot) => {
+              setDialog("none");
+              onBotCreated(bot);
+            }}
+          />,
+          document.body
+        )}
       <div className="sidebar-footer">
         {menuOpen && (
           <div className="account-menu" role="menu">
