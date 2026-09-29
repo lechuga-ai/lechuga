@@ -1,4 +1,4 @@
-import { basePreamble } from "./chat";
+import { systemPrompt } from "./prompt";
 import { Hono } from "hono";
 import type { AppEnv, Env } from "./types";
 import { streamChat, textDeltaStream } from "./gateway";
@@ -62,7 +62,7 @@ trial.post("/", async (c) => {
 
   let upstream;
   try {
-    upstream = await streamChat(c.env, TRIAL_MODEL, [{ role: "system", content: basePreamble() }, { role: "user", content }], { maxTokens: TRIAL.max_reply_tokens });
+    upstream = await streamChat(c.env, TRIAL_MODEL, [{ role: "system", content: systemPrompt({ model: TRIAL_MODEL }) }, { role: "user", content }], { maxTokens: TRIAL.max_reply_tokens });
   } catch (err) {
     console.error("gateway call failed (trial)", err);
     return c.json({ error: "the model isn't reachable right now" }, 502);

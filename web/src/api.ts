@@ -271,6 +271,31 @@ export async function getMe(): Promise<Me> {
 }
 
 // photo: a small square JPEG data URL, null to remove it, undefined to keep it.
+// Account > Memory (worker/src/memory.ts): what Lechuga keeps about you
+// across your own chats, and whether it's used.
+export type Memory = {
+  notes: string;
+  soul: string;
+  enabled: boolean;
+  // The overnight pass may read my chats; trainedAt is when it last did.
+  nightly: boolean;
+  trainedAt: number | null;
+  updatedAt: number | null;
+};
+
+export async function getMemory(): Promise<Memory> {
+  return expectJson(await apiFetch("/api/memory"));
+}
+
+export async function saveMemory(memory: { notes: string; soul: string; enabled: boolean; nightly: boolean }): Promise<Memory> {
+  return expectJson(await postJson("/api/memory", memory, "PUT"));
+}
+
+// Has Lechuga fold this chat into its memory of you. Costs about a message.
+export async function rememberChat(chatId: string): Promise<{ credits: number; memory: Memory }> {
+  return expectJson(await apiFetch(`/api/chats/${chatId}/remember`, { method: "POST" }));
+}
+
 export async function saveProfile(name: string, photo?: string | null): Promise<{ name: string; photo: number | null }> {
   return expectJson(await postJson("/api/me/profile", { name, photo }, "PUT"));
 }

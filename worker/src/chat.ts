@@ -1,5 +1,7 @@
 import { runReply } from "./reply";
 import { toolsFor } from "./tools";
+import { systemPrompt } from "./prompt";
+import { loadMemory, parseRemembered, rememberRequest, rememberTool, saveMemory } from "./memory";
 import { Hono } from "hono";
 import type { AppEnv, Env, ChatRow, MessageRow } from "./types";
 import { streamChat, collectText, type ChatTurn } from "./gateway";
@@ -301,12 +303,17 @@ chat.post("/chats/:id/messages", async (c) => {
   // After a "compact this chat", only the summary and what came after it.
   const { kept: history, dropped } = trimHistory(sinceLastSummary(fullHistory));
   const names = await speakerNames(c.env, chatRow);
+  // What Lechuga remembers about the person (memory.ts) goes in only when
+  // nobody else has ever been in the chat, so names is null and the typist
+  // is the owner. With it comes the tool that adds to it.
+  const memory = names ? null : await loadMemory(c.env, userId);
+  const withMemory = memory !== null && memory.enabled;
 
   const notice = dropped
     ? "This chat has grown long, so only its most recent part was sent to the model. Start a new chat if it loses the thread."
     : undefined;
-  const tools = toolsFor(c.env);
-  const reply = runReply(c.env, chatRow.model, forModel(history, names, tools.map((t) => t.name)), {
+  const tools = withMemory ? [...toolsFor(c.env), rememberTool(userId)] : toolsFor(c.env);
+  const reply = runReply(c.env, chatRow.model, forModel(history, names, { model: chatRow.model, toolNames: tools.map((t) => t.name), memory: withMemory ? memory : null }), {
     maxTokens: LIMITS.max_reply_tokens,
     effort,
     tools,
@@ -380,49 +387,15 @@ async function speakerNames(env: Env, chatRow: ChatRow): Promise<Map<string, str
   return names;
 }
 
-// Sent first in every chat. Two things the model can't know on its own:
-// what day it is (without it GLM assumes it's still the year its training
-// ended, and reasons from there), and that its knowledge has an end date,
-// so that it says so instead of guessing at recent things. And one thing we
-// ask of it: these models think out loud before answering, and GLM's thinking
-// tends to circle back over the same ground, which is paid for by the token.
-// toolNames: the tools this reply is offered, so the model is told only about
-// those. Told about tools it doesn't have, GLM writes a pretend call in its
-// answer and invents the result (seen on the free chat, 2026-09-21).
-export function basePreamble(toolNames: string[] = [], now = new Date()): string {
-  // Pacific time: most of Lechuga's people are in California, and the UTC
-  // date would be tomorrow's for them every evening.
-  const today = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "America/Los_Angeles" });
-  return (
-    `You're answering inside Lechuga, a small chat app made by friends for friends that runs open source models; if asked, say which model you are if you know, and that you're not Lechuga itself. ` +
-    `Today is ${today}. Your training data ends some time before that, so for anything recent (news, prices, versions, who holds which job) say that you may be out of date rather than guessing. ` +
-    `Most people here are in California: unless they say otherwise, assume Pacific time, US dollars, Fahrenheit, miles and American spelling. ` +
-    "Before you answer, think only as much as the question needs: settle each point once and move on, don't restate the question or your own conclusions, and for simple questions don't deliberate at all. " +
-    "Be direct and warm. Skip the preamble and the recap, and don't praise the question. " +
-    "Don't claim to remember anything from other chats; you can't. " +
-    "Files and pictures the person attached appear inline; read them before answering. " +
-    "For medical, legal or money questions, answer, then say when it's worth asking a professional. " +
-    toolNote(toolNames)
-  );
-}
-
-function toolNote(names: string[]): string {
-  if (names.length === 0) {
-    return "You have no tools in this chat: you can't search the web or open pages, so never write out a tool call or make up what one would return. If something needs looking up, say that you can't from here.";
-  }
-  const parts = [];
-  if (names.includes("web_search")) parts.push("use web_search for anything recent or that you're unsure of; each search costs the person a little, so don't search for things you know");
-  if (names.includes("read_page")) parts.push("use read_page on an address the person gives you, or to check a source before relying on it");
-  return `You have tools; call them properly rather than writing them into your answer. ${parts.join(". ").replace(/^u/, "U")}. Only say you searched or read something when you actually called the tool, and when you've used a page, link to it in your answer.`;
-}
-
-const SHARED_PREAMBLE =
-  "Several people are taking part in this chat. Each of their messages starts with the sender's name in square brackets, which the app adds. Don't start your own replies with a name in brackets.";
-
-// Stored messages, as the model should see them: pictures as image parts, a
-// compaction summary as a system message that explains what it is, and in a
-// shared chat, each person's turn marked with their name.
-function forModel(history: Turn[], names: Map<string, string> | null, toolNames: string[] = []): ChatTurn[] {
+// Stored messages, as the model should see them: first the system prompt
+// (prompt.ts), then pictures as image parts, a compaction summary as a
+// system message that explains what it is, and in a shared chat, each
+// person's turn marked with their name.
+function forModel(
+  history: Turn[],
+  names: Map<string, string> | null,
+  opts: { model: string; toolNames?: string[]; memory?: { notes: string; soul: string } | null }
+): ChatTurn[] {
   const tagged = (m: Turn): string | ContentPart[] => {
     const content = modelContent(m.content);
     if (!names) return content;
@@ -436,8 +409,8 @@ function forModel(history: Turn[], names: Map<string, string> | null, toolNames:
         ? { role: "system", content: SUMMARY_PREAMBLE + summaryText(m.content) }
         : { role: "assistant", content: m.content }
   );
-  const base = basePreamble(toolNames);
-  return [{ role: "system", content: names ? `${base}\n\n${SHARED_PREAMBLE}` : base }, ...turns];
+  const system = systemPrompt({ model: opts.model, toolNames: opts.toolNames, memory: opts.memory, shared: names !== null });
+  return [{ role: "system", content: system }, ...turns];
 }
 
 // "Compact this chat". The model reads what it would have been sent anyway
@@ -467,7 +440,7 @@ chat.post("/chats/:id/compact", async (c) => {
 
   let upstream;
   try {
-    upstream = await streamChat(c.env, chatRow.model, [...forModel(history, await speakerNames(c.env, chatRow)), { role: "user", content: SUMMARY_REQUEST }], {
+    upstream = await streamChat(c.env, chatRow.model, [...forModel(history, await speakerNames(c.env, chatRow), { model: chatRow.model }), { role: "user", content: SUMMARY_REQUEST }], {
       maxTokens: LIMITS.summary_tokens,
       effort: "low",
     });
@@ -502,6 +475,69 @@ chat.post("/chats/:id/compact", async (c) => {
     }),
   ]);
   return c.json({ ok: true, credits });
+});
+
+// "Remember this chat". The model reads the chat as it would have been sent
+// anyway, plus what it already keeps about the person, and writes both
+// memory documents afresh with this chat folded in (memory.ts). Nothing is
+// added to the chat; the result lives under Account > Memory. Charged like
+// a reply, once, and only from a chat nobody else has ever been in, since
+// the memory it writes is the owner's alone.
+chat.post("/chats/:id/remember", async (c) => {
+  const chatId = c.req.param("id");
+  const userId = c.get("userId");
+  const access = await chatAccess(c.env, chatId, userId);
+  if (!access) return c.json({ error: "not found" }, 404);
+  if (access.role !== "owner") return c.json({ error: "only the person who started a chat can remember it" }, 403);
+  const chatRow = access.chat;
+  if ((await speakerNames(c.env, chatRow)) !== null) return c.json({ error: "a shared chat can't go into your memory" }, 403);
+
+  const [account, recent, memory] = await Promise.all([accountState(c.env, userId), recentActivity(c.env, userId, userId), loadMemory(c.env, userId)]);
+  if (account.suspended) return c.json({ error: "this account is suspended", code: "suspended" }, 403);
+  if (recent.inFlight > 0) return c.json({ error: "a reply is still being written. Wait for it to finish, then try again." }, 429);
+  if (creditsEnforced(c.env) && account.balance <= 0) return c.json({ error: "you're out of lettuce", code: "out_of_credits" }, 402);
+  if (!memory.enabled) return c.json({ error: "memory is turned off. Turn it on under Account, then Memory, and try again." }, 400);
+
+  const { results: all } = await c.env.DB.prepare("SELECT role, content, user_id FROM messages WHERE chat_id = ? ORDER BY created_at ASC")
+    .bind(chatId)
+    .all<Turn>();
+  const { kept: history } = trimHistory(sinceLastSummary(all));
+  if (history.length < 2) return c.json({ error: "there isn't anything here to remember yet" }, 400);
+
+  let upstream;
+  try {
+    upstream = await streamChat(c.env, chatRow.model, [...forModel(history, null, { model: chatRow.model, memory }), { role: "user", content: rememberRequest(memory) }], {
+      maxTokens: LIMITS.remember_tokens,
+      effort: "low",
+    });
+  } catch (err) {
+    console.error("gateway call failed", err);
+    return c.json({ error: "the model isn't reachable right now" }, 502);
+  }
+  const written = (await collectText(upstream.stream)).trim();
+  const { promptTokens, completionTokens } = await upstream.usage;
+  if (!written) return c.json({ error: "the model didn't write anything. Try again." }, 502);
+
+  const tokensIn = promptTokens ?? history.reduce((n, m) => n + estimateMessageTokens(m.content), 0);
+  const tokensOut = completionTokens ?? estimateTokens(written);
+  const credits = creditsFor(chatRow.model, tokensIn, tokensOut);
+  // The ledger row has no message to point at; its note says what it was.
+  await c.env.DB.batch(
+    ledgerStatements(c.env, {
+      userId,
+      delta: -credits,
+      reason: "message",
+      ref: null,
+      model: chatRow.model,
+      chatId,
+      promptTokens: tokensIn,
+      completionTokens: tokensOut,
+      costUsd: costUsdFor(chatRow.model, tokensIn, tokensOut),
+      note: "remember",
+    })
+  );
+  const saved = await saveMemory(c.env, userId, parseRemembered(written, memory));
+  return c.json({ ok: true, credits, memory: saved });
 });
 
 async function generateTitle(env: Env, chatId: string, firstMessage: string) {

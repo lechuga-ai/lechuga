@@ -5,7 +5,7 @@ import { MessageList } from "../components/MessageList";
 import { Composer } from "../components/Composer";
 import { AvatarStack } from "../components/Avatar";
 import { ShareDialog } from "../components/ShareDialog";
-import { ApiError, compactChat, getChat, sendMessage, type Me, type Message, type Model, type Person, type Roster, type Step } from "../api";
+import { ApiError, compactChat, getChat, rememberChat, sendMessage, type Me, type Message, type Model, type Person, type Roster, type Step } from "../api";
 import { takeStartMessage } from "../startMessage";
 import { composeMessage, estimateMessageTokens, type Attachment } from "../../../worker/src/attachments";
 import { sinceLastSummary } from "../../../worker/src/summary";
@@ -38,6 +38,7 @@ export function ChatPage({ me, models, expectedModel, onFirstMessage, refreshCha
   // Said by the server alongside a reply: the chat was too long to send whole.
   const [notice, setNotice] = useState<string | null>(null);
   const [compacting, setCompacting] = useState(false);
+  const [remembering, setRemembering] = useState(false);
   // Whose chat this is and who's in it. A chat made a moment ago on the start
   // page is mine and has nobody else in it yet.
   const [role, setRole] = useState<"owner" | "member">("owner");
@@ -209,7 +210,7 @@ export function ChatPage({ me, models, expectedModel, onFirstMessage, refreshCha
   // chat from the server, never a shorter one: just after a reply streams,
   // what's on screen is briefly ahead of what's stored.
   const idleRef = useRef(true);
-  idleRef.current = streamingText === null && !compacting;
+  idleRef.current = streamingText === null && !compacting && !remembering;
   useEffect(() => {
     if (!isShared) return;
     const timer = setInterval(async () => {
@@ -247,6 +248,25 @@ export function ChatPage({ me, models, expectedModel, onFirstMessage, refreshCha
   // Compacting spends the owner's credits, so it's only offered to them.
   const offerCompact =
     role === "owner" && carried >= config.limits.compact_offer_tokens && streamingText === null && sinceLastSummary(messages).length >= 3;
+
+  // Remember: Lechuga folds this chat into what it keeps about you (Account >
+  // Memory). Only in a chat nobody else has ever been in, since the memory
+  // is yours alone; the server holds the same line. Costs about a message.
+  const canRemember = role === "owner" && !isShared && (roster?.members.length ?? 0) === 0 && messages.length >= 2 && streamingText === null && !compacting;
+
+  async function remember() {
+    setRemembering(true);
+    setNotice(null);
+    try {
+      await rememberChat(chatId);
+      setNotice("Lechuga has folded this chat into what it remembers about you. Read or change it under Account, then Memory.");
+      refreshBalance();
+    } catch (err) {
+      setNotice((err as Error).message || "couldn't remember the chat, try again");
+    } finally {
+      setRemembering(false);
+    }
+  }
 
   async function compact() {
     setCompacting(true);
@@ -288,6 +308,7 @@ export function ChatPage({ me, models, expectedModel, onFirstMessage, refreshCha
         meId={me.id}
       />
       {notice && <p className="chat-notice">{notice}</p>}
+      {remembering && <p className="chat-notice">Remembering: Lechuga is reading the chat and updating what it keeps about you…</p>}
       {(offerCompact || compacting) && (
         <p className="chat-notice">
           {compacting ? (
@@ -327,6 +348,17 @@ export function ChatPage({ me, models, expectedModel, onFirstMessage, refreshCha
               {role === "owner" && (
                 <button type="button" className="composer-share-btn" onClick={() => setSharing(true)}>
                   {isShared ? "Sharing" : "Share"}
+                </button>
+              )}
+              {canRemember && (
+                <button
+                  type="button"
+                  className="composer-share-btn"
+                  onClick={remember}
+                  disabled={remembering}
+                  title="Lechuga reads this chat and updates what it remembers about you for every chat. Costs about one message. See it under Account, then Memory."
+                >
+                  {remembering ? "Remembering…" : "Remember"}
                 </button>
               )}
             </div>

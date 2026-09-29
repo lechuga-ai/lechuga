@@ -1,12 +1,14 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { adminEmails, type AppEnv } from "./types";
+import { adminEmails, type AppEnv, type Env } from "./types";
 import { chat } from "./chat";
 import { AUTH_BASE_PATH, createAuth, publicAuthConfig } from "./auth";
 import { inviteLookup, invites } from "./invites";
 import { accessRequests, feedbackRequests, notes } from "./requests";
 import { admin } from "./admin";
 import { avatars, me } from "./me";
+import { memory } from "./memory";
+import { nightly } from "./nightly";
 import { sharing } from "./sharing";
 import { billing } from "./billing";
 import { billingWebhook } from "./billing-webhook";
@@ -82,6 +84,7 @@ app.use("/api/*", async (c, next) => {
 });
 
 app.route("/api/me", me);
+app.route("/api/memory", memory);
 app.route("/api/avatars", avatars);
 app.route("/api/invites", invites);
 app.route("/api/notes", notes);
@@ -93,4 +96,10 @@ app.route("/api", chat);
 
 app.get("*", (c) => c.env.ASSETS.fetch(c.req.raw));
 
-export default app;
+export default {
+  fetch: app.fetch,
+  // The cron in wrangler.toml: the overnight memory pass (nightly.ts).
+  scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
+    ctx.waitUntil(nightly(env));
+  },
+} satisfies ExportedHandler<Env>;

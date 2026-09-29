@@ -5,7 +5,7 @@
   "scripts": {
     "_comment_predev": "wrangler dev refuses to start unless the assets directory exists, and it is gitignored, so a fresh clone has none. Locally Vite serves the app on 5173 and the worker only answers /api, so an empty directory is enough; npm run build fills it properly.",
     "predev": "node -e \"require('fs').mkdirSync('public', { recursive: true })\"",
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --test-scheduled",
     "deploy:dev": "wrangler deploy --env dev",
     "deploy:prod": "wrangler deploy --env prod",
     "db:migrate:local": "wrangler d1 execute lechuga-dev --local --file=src/db/0001_init.sql",
@@ -38,6 +38,9 @@
     "db:migrate:local:0010": "wrangler d1 execute lechuga-dev --local --file=src/db/0010_tool_calls.sql",
     "db:migrate:dev:0010": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0010_tool_calls.sql",
     "db:migrate:prod:0010": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0010_tool_calls.sql",
+    "db:migrate:local:0011": "wrangler d1 execute lechuga-dev --local --file=src/db/0011_memory.sql",
+    "db:migrate:dev:0011": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0011_memory.sql",
+    "db:migrate:prod:0011": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0011_memory.sql",
     "db:check:local": "wrangler d1 execute lechuga-dev --local --file=src/db/check_balances.sql",
     "db:check:dev": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/check_balances.sql",
     "db:check:prod": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/check_balances.sql"

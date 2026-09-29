@@ -5,6 +5,7 @@ import { adminReplyEmail, declinedEmail } from "./email/templates";
 import { createInvite, normalizeEmail } from "./invites";
 import { checkUsernameFormat } from "./username";
 import { ledgerStatements } from "./credits";
+import { nightly } from "./nightly";
 import config from "../config.json";
 
 // Everything here runs after the session check and requires isAdmin, which
@@ -16,6 +17,10 @@ admin.use("*", async (c, next) => {
   if (!c.get("isAdmin")) return c.json({ error: "not found" }, 404);
   await next();
 });
+
+// The overnight memory pass, run now instead of waiting for the cron
+// (nightly.ts): for checking it on a tier. Answers when it's done.
+admin.post("/nightly", async (c) => c.json(await nightly(c.env)));
 
 const TYPES = new Set(["access", "feedback", "support"]);
 const STATUSES = new Set(["open", "approved", "declined", "replied", "closed"]);

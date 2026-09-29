@@ -85,6 +85,30 @@ type NewsEntry = { date: string; title: string; intro: string; items: { lead: st
 const NEWS: NewsEntry[] = [
   {
     date: "September 28, 2026",
+    title: "Lechuga remembers",
+    intro:
+      "Until now every chat started from nothing. Lechuga can now carry a little about you from one chat to the next, and it has a clearer idea of who it is.",
+    items: [
+      {
+        lead: "A memory, in two notes.",
+        text: "What to remember about you (what you're working on, what you like) and how to be with you (short answers, no bullet points, whatever you'd want). Both live under Account, then Memory, where you can read them, rewrite them, switch them off, or wipe them. They go with every message in your own chats and never in a shared one, so they cost a few credits a message while they're not empty.",
+      },
+      {
+        lead: "Remember, beside Share.",
+        text: "Press it in a chat and Lechuga reads the chat and updates both notes, keeping what still holds and dropping what's out of date. It costs about one message. Or just tell it: \"remember that I'm vegetarian\" saves a line on the spot.",
+      },
+      {
+        lead: "And it learns overnight.",
+        text: "Once a night Lechuga reads what you said that day in your own chats and keeps only what's clearly lasting, for the price of about one message. It's on by default and has its own switch on the Memory page; off, only Remember and what you type reach the notes.",
+      },
+      {
+        lead: "It knows its name.",
+        text: "Ask what it is and it says it's Lechuga, running on whichever model the chat is on. It also knows what it can and can't do here (pictures, search, memory, compacting), and that questions about credits or invites are for the Help page, not for guessing.",
+      },
+    ],
+  },
+  {
+    date: "September 28, 2026",
     title: "Lechuga on your home screen",
     intro:
       "Lechuga can now be installed like an app on an iPhone, iPad, Mac, Android phone or desktop. It's the same site and the same account; it just opens in a window of its own, without the browser around it.",
