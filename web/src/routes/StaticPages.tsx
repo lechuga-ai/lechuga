@@ -85,6 +85,22 @@ type NewsEntry = { date: string; title: string; intro: string; items: { lead: st
 const NEWS: NewsEntry[] = [
   {
     date: "September 28, 2026",
+    title: "Lechuga on your home screen",
+    intro:
+      "Lechuga can now be installed like an app on an iPhone, iPad, Mac, Android phone or desktop. It's the same site and the same account; it just opens in a window of its own, without the browser around it.",
+    items: [
+      {
+        lead: "How to install it.",
+        text: "Help has the steps for each. In short: on an iPhone or iPad, Safari's share button, then Add to Home Screen. On a Mac, Add to Dock in Safari's File menu, or the install icon in Chrome's address bar. On Android, Install app in Chrome's menu.",
+      },
+      {
+        lead: "Signing in there.",
+        text: "An installed copy emails you a six-digit code instead of a link, because a link would open in the browser, and the browser and the app don't share a sign-in.",
+      },
+    ],
+  },
+  {
+    date: "September 28, 2026",
     title: "Easier to find your way around",
     intro:
       "A handful of changes for anyone new here, and for anyone who has ever lost a chat. Nothing about the models or prices has changed.",

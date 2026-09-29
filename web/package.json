@@ -4,9 +4,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build"
+    "build": "tsc -b && vite build",
+    "build:native": "tsc -b && vite build --mode native --outDir dist-native",
+    "cap:sync": "npm run build:native && cap sync",
+    "ios": "cap open ios",
+    "android": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/keyboard": "^8.0.5",
     "better-auth": "^1.7.5",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",

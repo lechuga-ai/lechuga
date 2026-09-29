@@ -2,7 +2,7 @@ import { basePreamble } from "./chat";
 import { Hono } from "hono";
 import type { AppEnv, Env } from "./types";
 import { streamChat, textDeltaStream } from "./gateway";
-import { verifyTurnstile } from "./turnstile";
+import { passesBotCheck } from "./turnstile";
 import config from "../config.json";
 
 // Public: one free chat from the home page, no account. This is the only
@@ -30,7 +30,7 @@ async function visitorHash(env: Env, ip: string, day: string): Promise<string> {
 
 trial.post("/", async (c) => {
   const ip = c.req.header("cf-connecting-ip") ?? "local";
-  if (!(await verifyTurnstile(c.env, c.req.header("x-captcha-response") ?? null, ip === "local" ? null : ip))) {
+  if (!(await passesBotCheck(c.env, c.req.raw.headers))) {
     return c.json({ error: "the bot check didn't pass; reload the page and try again" }, 403);
   }
 

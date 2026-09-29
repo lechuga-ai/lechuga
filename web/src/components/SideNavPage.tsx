@@ -58,6 +58,11 @@ export function SideNavPage({ title, nav, navLabel = "On these pages", children 
   return (
     <div className="doc-page" ref={pageRef}>
       <div className="doc-inner docnav">
+        {/* A way back that doesn't depend on the browser's back button:
+            inside the native app there isn't one. */}
+        <Link className="doc-back" to="/">
+          ← Home
+        </Link>
         <Link className="doc-brand" to="/">
           <span className="logo">
             <img src="/lechuga_logo.png" alt="" />

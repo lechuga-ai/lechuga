@@ -1,4 +1,40 @@
+import { useEffect, useState } from "react";
 import { avatarUrl, type Person } from "../api";
+import { NATIVE, apiFetch } from "../native";
+
+// What to put in the img. On the website, the photo's URL: the browser sends
+// the session cookie with it. Inside the native app an <img> can't send the
+// sign-in token, so the photo is fetched with it and shown from memory.
+function usePhotoSrc(url: string | null): string | null {
+  const [src, setSrc] = useState<string | null>(NATIVE ? null : url);
+  useEffect(() => {
+    if (!NATIVE) {
+      setSrc(url);
+      return;
+    }
+    if (!url) {
+      setSrc(null);
+      return;
+    }
+    let cancelled = false;
+    let object: string | null = null;
+    apiFetch(url)
+      .then((res) => (res.ok ? res.blob() : null))
+      .then((blob) => {
+        if (cancelled || !blob) return;
+        object = URL.createObjectURL(blob);
+        setSrc(object);
+      })
+      .catch(() => {
+        // The initial shows instead.
+      });
+    return () => {
+      cancelled = true;
+      if (object) URL.revokeObjectURL(object);
+    };
+  }, [url]);
+  return src;
+}
 
 // Someone's face: their photo, or failing that their initial on a colour
 // that's always the same for the same person. owner adds the ring that marks
@@ -18,7 +54,7 @@ function initial(name: string): string {
 type Props = { person: Person; size?: number; owner?: boolean };
 
 export function Avatar({ person, size = 20, owner = false }: Props) {
-  const url = avatarUrl(person);
+  const url = usePhotoSrc(avatarUrl(person));
   const title = owner ? `${person.name} (started this chat)` : person.name;
   return (
     <span

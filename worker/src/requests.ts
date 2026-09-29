@@ -3,7 +3,7 @@ import type { AppEnv, RequestRow, RequestType } from "./types";
 import { sendEmail } from "./email";
 import { requestReceivedEmail } from "./email/templates";
 import { normalizeEmail } from "./invites";
-import { verifyTurnstile } from "./turnstile";
+import { passesBotCheck } from "./turnstile";
 import config from "../config.json";
 
 const MAX_BODY = 2000;
@@ -33,7 +33,7 @@ export const accessRequests = new Hono<AppEnv>();
 
 accessRequests.post("/", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const ok = await verifyTurnstile(c.env, c.req.header("x-captcha-response") ?? null, c.req.header("cf-connecting-ip") ?? null);
+  const ok = await passesBotCheck(c.env, c.req.raw.headers);
   if (!ok) return c.json({ error: "the bot check didn't pass, reload and try again" }, 400);
 
   const email = normalizeEmail(body?.email);
@@ -68,7 +68,7 @@ export const feedbackRequests = new Hono<AppEnv>();
 
 feedbackRequests.post("/", async (c) => {
   const body = await c.req.json().catch(() => ({}));
-  const ok = await verifyTurnstile(c.env, c.req.header("x-captcha-response") ?? null, c.req.header("cf-connecting-ip") ?? null);
+  const ok = await passesBotCheck(c.env, c.req.raw.headers);
   if (!ok) return c.json({ error: "the bot check didn't pass, reload and try again" }, 400);
 
   const text = clean(body?.body, MAX_BODY);

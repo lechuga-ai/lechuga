@@ -359,6 +359,7 @@ export const HELP_NAV: NavGroup[] = [
     sections: [
       { id: "questions", label: "Questions" },
       { id: "how-to", label: "How to use it" },
+      { id: "install", label: "On your phone or desktop" },
       { id: "feedback", label: "Feedback" },
     ],
   },

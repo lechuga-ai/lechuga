@@ -8,8 +8,12 @@ worker/wrangler.toml
 .env
 .env.*
 !.env.example
+# The native apps' build settings: no secrets, and the build needs them.
+!web/.env.native
 .wrangler/
 dist/
+# What goes inside the native apps (npm run build:native); cap sync copies it.
+web/dist-native/
 *.log
 *.tsbuildinfo
 .DS_Store

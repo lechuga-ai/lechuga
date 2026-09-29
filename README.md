@@ -72,6 +72,14 @@ eval/                    shell scripts that test a running copy
 
 All in `config.json`: messages per day and per minute, replies in flight at once per account (the balance is checked before a reply and charged after, so this is what stops an overdraft), a cap on reply length, history sent to the model trimmed to a token budget, invites per day, free chats per visitor and per day, and a daily ceiling on the two public forms. Turnstile guards the public forms and sign-in. `reserved_usernames` and `blocked_username_fragments` in the same file include offensive words, because that is what they exist to refuse.
 
+## The native apps (iOS and Android)
+
+`web/ios` and `web/android` are Capacitor projects: the same React app, built with `npm run build:native` (which reads `web/.env.native` and writes `web/dist-native`), inside a native shell. Xcode and Android Studio build and ship them; `npm run cap:sync` from `web/` rebuilds and copies the web build into both projects, and `npm run ios` or `npm run android` opens the project. On Apple silicon Macs the iOS app runs from the Mac App Store as is, so it stands in for a Mac app.
+
+Inside the app the pages come from the phone, so a few things differ from the site, all keyed on `NATIVE` in `web/src/native.ts`: every `/api` call goes to the absolute `VITE_API_BASE` (dev by default; set it to prod for a release); sign-in returns a bearer token (Better Auth's `bearer` plugin) that is stored and sent instead of the cookie, and uses the emailed code, not the link; Google sign-in is off until it has Google's native SDK; and buying credits is hidden, because both stores require their own in-app purchase for anything like credits. The worker allows the app's two origins (`worker/src/native-app.ts`) for CORS and trusts them in Better Auth. Turnstile can't run on the iOS app's pages (it needs an http(s) origin, which Capacitor on iOS can't provide), so the worker lets the app's two origins through the bot check without a token (`passesBotCheck` in `worker/src/turnstile.ts`); the invite gate and the forms' daily ceilings are what stand behind it there.
+
+Still to do on the apps: Google sign-in (needs Google's native SDK); Android has been set up the same way but not yet run on a device; the launch screen is still Capacitor's; and the icons are upscaled from the 256px favicon until there is a larger source.
+
 ## Running it locally
 
 You need Node 20+ and a Cloudflare account (the free plan is enough to look around; model replies need Workers AI).
@@ -138,6 +146,7 @@ Three outside registrations are tied to a tier's hostname and must follow it if 
 - **Tools:** add an entry to `TOOLS` in `worker/src/tools.ts`: a description the model reads, a `run` function, what it costs. `reply.ts` handles the rounds; `config.json` `tools` has the prices and the cap on rounds. A tool backed by someone's own account (mail, a calendar) will also need an account link and a check for it.
 - **What the model is told:** `basePreamble` in `chat.ts`: the date, that its knowledge has an end, where people are, how to think and behave, and which tools it has. It's sent with every reply, so every word costs on every message.
 - **What's new:** add a dated entry at the top of `NEWS` in `web/src/routes/StaticPages.tsx` with each release.
+- **Installed as an app:** `web/public/manifest.webmanifest` is what Safari's Add to Home Screen / Add to Dock and Chrome's Install read: the name, colours and icons (`web/public/icons/`, all made from `favicon.png`; the maskable ones keep the lettuce inside the centre so Android's launcher shapes don't clip it). `web/public/sw.js` is a small cache that makes an installed copy open instantly; it never touches `/api`, and it's registered only from a production build. If you change what it caches, bump its `CACHE` name so old copies are dropped. Installed copies on iOS and macOS don't share cookies with the browser, so they sign in with an emailed code (`emailOTP` in `worker/src/auth.ts`, `web/src/installed.ts`) instead of the link.
 - **Terms:** when the meaning of `web/src/components/Legal.tsx` changes, update its date and `terms_version`.
 
 ## Testing

@@ -8,6 +8,7 @@ import {
   type Me,
 } from "../api";
 import { DeleteAccount } from "./DeleteAccount";
+import { NATIVE } from "../native";
 
 type Props = { me: Me };
 
@@ -50,7 +51,8 @@ function History({ rows }: { rows: BillingData["history"] }) {
         </ol>
       )}
       <p className="billing-panel-note">
-        Receipts are on Stripe's page, linked above once you've bought something. <a href="/welcome#what-it-costs-us">Where the money goes</a>.
+        {!NATIVE && <>Receipts are on Stripe's page, linked above once you've bought something. </>}
+        <a href="/welcome#what-it-costs-us">Where the money goes</a>.
       </p>
     </section>
   );
@@ -113,7 +115,16 @@ export function BillingPanel({ me }: Props) {
             </div>
           </section>
 
-          {!data.purchasesOpen ? (
+          {NATIVE ? (
+            /* The app stores require their own in-app purchase for anything
+               like credits and refuse apps that sell them through Stripe, so
+               the native app doesn't sell at all. Balance, purchases and
+               subscription are the account's, wherever they were bought. */
+            <p className="billing-note">
+              Buying credits isn't available in this app. Your balance, purchases and subscription are the same ones as
+              on the website.
+            </p>
+          ) : !data.purchasesOpen ? (
             <p className="billing-note">
               Buying credits isn't open yet. Until it is, you can keep chatting; your balance just keeps count.
             </p>
