@@ -63,6 +63,7 @@ export function Sidebar({
   const [now, setNow] = useState(() => Date.now());
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialog, setDialog] = useState<Dialog>("none");
+  const [botMenuOpen, setBotMenuOpen] = useState(false);
   const [remaining, setRemaining] = useState(me.invitesRemaining);
   // The search box. While it has words in it the list below is the server's
   // answer (title or message text containing every word), each with a line
@@ -98,6 +99,7 @@ export function Sidebar({
   // then the ones others have shared with me, whichever bot they're with.
   // A search looks across all of them.
   const seedId = bots.find((b) => b.is_default)?.id ?? null;
+  const selectedBot = bots.find((b) => b.id === selectedBotId) ?? null;
   const mine = chats.filter((c) => c.user_id === me.id && (c.bot_id ?? seedId) === selectedBotId);
   const sharedWithMe = chats.filter((c) => c.user_id !== me.id);
   const shown: (Chat & { snippet?: string | null })[] = searching ? (hits ?? []) : [...mine, ...sharedWithMe];
@@ -118,32 +120,7 @@ export function Sidebar({
           Lechuga <span className="alpha" title="Early days: rough edges expected">alpha</span>
         </span>
       </div>
-      {/* The bots, Seed first. The chat list below is the selected one's.
-          The pencil opens the bot's page; the last row makes a new one. */}
-      <div className="bot-strip" role="list" aria-label="Your bots">
-        {bots.map((bot) => (
-          <div
-            key={bot.id}
-            role="listitem"
-            className={`bot-chip ${bot.id === selectedBotId ? "active" : ""}`}
-            onClick={() => onSelectBot(bot.id)}
-            title={bot.soul ? bot.soul.slice(0, 160) : bot.name}
-          >
-            <Avatar person={{ id: bot.id, name: bot.name, username: null, photo: null }} size={22} />
-            <span className="bot-chip-name">{bot.name}</span>
-            <Link to={`/bots/${bot.id}`} className="bot-chip-edit" onClick={(e) => e.stopPropagation()} title={`${bot.name}: name, model, how it behaves`} aria-label={`Edit ${bot.name}`}>
-              ✎
-            </Link>
-          </div>
-        ))}
-        <button type="button" className="bot-chip bot-chip-new" onClick={() => openDialog("newBot")}>
-          <span className="bot-chip-plus">+</span>
-          <span className="bot-chip-name">New bot</span>
-        </button>
-      </div>
-      <button className="new-chat-btn" onClick={onNewChat}>
-        New chat
-      </button>
+      {/* Search first: it looks across every chat, whichever bot. */}
       <input
         className="chat-search"
         type="search"
@@ -155,6 +132,43 @@ export function Sidebar({
         placeholder="Search chats"
         aria-label="Search chats"
       />
+      <button type="button" className="new-bot-btn" onClick={() => openDialog("newBot")}>
+        <span className="new-bot-plus">+</span> New bot
+      </button>
+      {/* Which bot you're with: New chat starts one with it and the list is
+          its chats. Press it to switch. */}
+      <div className="bot-switch">
+        <span className="bot-switch-label">Chats with</span>
+        <button type="button" className="bot-switch-btn" onClick={() => setBotMenuOpen((v) => !v)} aria-expanded={botMenuOpen} aria-haspopup="menu">
+          {selectedBot && <Avatar person={{ id: selectedBot.id, name: selectedBot.name, username: null, photo: null }} size={22} />}
+          <span className="bot-switch-name">{selectedBot?.name ?? "…"}</span>
+          <span className="account-caret">{botMenuOpen ? "▴" : "▾"}</span>
+        </button>
+        {botMenuOpen && (
+          <div className="bot-menu" role="menu">
+            {bots.map((bot) => (
+              <button
+                key={bot.id}
+                type="button"
+                role="menuitemradio"
+                aria-checked={bot.id === selectedBotId}
+                className={bot.id === selectedBotId ? "current" : ""}
+                onClick={() => {
+                  setBotMenuOpen(false);
+                  onSelectBot(bot.id);
+                }}
+                title={bot.soul ? bot.soul.slice(0, 160) : undefined}
+              >
+                <Avatar person={{ id: bot.id, name: bot.name, username: null, photo: null }} size={20} />
+                <span className="bot-switch-name">{bot.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <button className="new-chat-btn" onClick={onNewChat}>
+        New chat
+      </button>
       <div className="chat-list">
         {searching && hits !== null && hits.length === 0 && <p className="chat-list-empty">No chat has those words.</p>}
         {!searching && mine.length === 0 && sharedWithMe.length === 0 && <p className="chat-list-empty">No chats yet with this bot.</p>}

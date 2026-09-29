@@ -95,11 +95,15 @@ const NEWS: NewsEntry[] = [
       },
       {
         lead: "Name one and it knows what it's for.",
-        text: "New bot, in the list on the left, asks for a name and nothing else. Lechuga writes a first draft of how the bot should behave from the name alone (try Penny Pincher, or Sous Chef), and opens its page so you can rewrite it. A bot can have its own model for new chats, too.",
+        text: "New bot, at the top on the left, asks one thing: what you'd like to name it. Think of it as hiring someone for one job, and name it for the job. Lechuga works out from the name alone how the bot should behave (try Penny Pincher, or Sous Chef), and you're chatting with it straight away.",
       },
       {
-        lead: "One list, one bot at a time.",
-        text: "Pick a bot on the left and the chat list is that bot's chats; New chat starts one with it. Chats people have shared with you sit underneath whichever bot you're on. The pencil beside a bot opens its page.",
+        lead: "Chats with one bot at a time.",
+        text: "\"Chats with Seed\" on the left says which bot you're with: New chat starts one with it, and the list is its chats. Press it to switch. Chats people have shared with you sit underneath whichever bot you're on, and the search box above looks across everything.",
+      },
+      {
+        lead: "Bot Manager.",
+        text: "Three dots at the top right of any chat open a small menu. Bot Manager is a page under Account with every bot on it: its name, the model its new chats start on, and how it behaves, which you can rewrite from scratch. From a chat it lands on the bot you're with.",
       },
       {
         lead: "Memory is yours; the soul is the bot's.",

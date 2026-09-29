@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
+import { ViewMenu } from "./components/ViewMenu";
 import { StartPage } from "./routes/StartPage";
 import { ChatPage } from "./routes/ChatPage";
 import { setStartMessage } from "./startMessage";
@@ -83,24 +84,33 @@ export default function App({ me, onSignOut }: Props) {
   // The selected bot, falling back to Seed when the remembered one is gone.
   const selectedBot = bots.find((b) => b.id === selectedBotId) ?? bots[0] ?? null;
 
-  function selectBot(id: string) {
+  function rememberBot(id: string) {
     setSelectedBotId(id);
     try {
       localStorage.setItem(BOT_KEY, id);
     } catch {
       // fine without
     }
-    // A bot that has its own model starts new chats on it.
+  }
+
+  // Switching bots in the sidebar: the list becomes its chats and "/" starts
+  // one with it, on its own model if it has one.
+  function selectBot(id: string) {
+    rememberBot(id);
     const bot = bots.find((b) => b.id === id);
     if (bot?.model && models.some((m) => m.id === bot.model)) setSelectedModel(bot.model);
     setDrawerOpen(false);
     navigate("/");
   }
 
+  // A new bot is simply the one you're now on; its page is in Bot Manager
+  // when wanted, not forced.
   function handleBotCreated(bot: Bot) {
     setBots((prev) => [...prev, bot]);
-    selectBot(bot.id);
-    navigate(`/bots/${bot.id}`);
+    rememberBot(bot.id);
+    if (bot.model && models.some((m) => m.id === bot.model)) setSelectedModel(bot.model);
+    setDrawerOpen(false);
+    navigate("/");
   }
 
   function refreshBalance() {
@@ -111,6 +121,10 @@ export default function App({ me, onSignOut }: Props) {
 
   function selectChat(id: string) {
     setDrawerOpen(false);
+    // The sidebar follows the chat to its bot, so New chat and the list
+    // are the same bot's. A chat shared with me is with someone else's bot.
+    const chat = chats.find((c) => c.id === id);
+    if (chat && chat.user_id === me.id && chat.bot_id && chat.bot_id !== selectedBot?.id) rememberBot(chat.bot_id);
     navigate(`/c/${id}`);
   }
 
@@ -167,6 +181,7 @@ export default function App({ me, onSignOut }: Props) {
         {drawerOpen ? "✕" : "☰"}
       </button>
       {drawerOpen && <div className="drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
+      <ViewMenu botId={selectedBot?.id ?? null} />
       <Sidebar
         chats={chats}
         bots={bots}
