@@ -1,10 +1,12 @@
 apply plugin: 'com.android.application'
 
 android {
+    // The code package (MainActivity lives in ai.lechuga.app); the store id
+    // is applicationId below. They don't have to match.
     namespace = "ai.lechuga.app"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "ai.lechuga.app"
+        applicationId "ai.lechuga.mobile"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

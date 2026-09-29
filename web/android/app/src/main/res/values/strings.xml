@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Lechuga</string>
     <string name="title_activity_main">Lechuga</string>
-    <string name="package_name">ai.lechuga.app</string>
-    <string name="custom_url_scheme">ai.lechuga.app</string>
+    <string name="package_name">ai.lechuga.mobile</string>
+    <string name="custom_url_scheme">ai.lechuga.mobile</string>
 </resources>

@@ -4,7 +4,8 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // build:native` (see .env.native), wrapped by Capacitor. `npx cap sync` copies
 // that build into ios/ and android/; Xcode and Android Studio build from there.
 const config: CapacitorConfig = {
-  appId: "ai.lechuga.app",
+  // Not ai.lechuga.app: that name was already taken on Apple's side.
+  appId: "ai.lechuga.mobile",
   appName: "Lechuga",
   webDir: "dist-native",
   server: {
