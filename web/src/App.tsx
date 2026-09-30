@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, matchPath, useLocation, useNavigate } from "react-router-dom";
 import { Sidebar } from "./components/Sidebar";
 import { StartPage } from "./routes/StartPage";
+import { BotStartPage } from "./routes/BotStartPage";
 import { ChatPage } from "./routes/ChatPage";
 import { setStartMessage } from "./startMessage";
 import type { Attachment } from "../../worker/src/attachments";
@@ -37,8 +38,11 @@ export default function App({ me, onSignOut }: Props) {
   const [balance, setBalance] = useState(me.balance);
 
   const activeChatId = matchPath("/c/:id", location.pathname)?.params.id ?? null;
-  // "/" keeps the landing look (photo, wordmark, one box); a chat is chat mode.
-  const landing = activeChatId === null;
+  // A bot's own start page, /b/:botId: an empty chat with it.
+  const startBotId = matchPath("/b/:botId", location.pathname)?.params.botId ?? null;
+  // Only "/" keeps the landing look (photo, wordmark, one box), for arriving.
+  // Everything else, a chat or a bot's start page, is chat mode.
+  const landing = activeChatId === null && startBotId === null;
 
   useEffect(() => {
     listChats().then(setChats).catch(() => setChats([]));
@@ -81,7 +85,8 @@ export default function App({ me, onSignOut }: Props) {
   }
 
   // The selected bot, falling back to Seed when the remembered one is gone.
-  const selectedBot = bots.find((b) => b.id === selectedBotId) ?? bots[0] ?? null;
+  // On a bot's start page, that bot.
+  const selectedBot = bots.find((b) => b.id === (startBotId ?? selectedBotId)) ?? bots[0] ?? null;
 
   function rememberBot(id: string) {
     setSelectedBotId(id);
@@ -92,14 +97,14 @@ export default function App({ me, onSignOut }: Props) {
     }
   }
 
-  // Switching bots in the sidebar: the list becomes its chats and "/" starts
-  // one with it, on its own model if it has one.
+  // New chat with a bot: its start page, on its own model if it has one.
+  // The drawer, where there is one, stays as it was: it closes when you
+  // close it.
   function selectBot(id: string) {
     rememberBot(id);
     const bot = bots.find((b) => b.id === id);
     if (bot?.model && models.some((m) => m.id === bot.model)) setSelectedModel(bot.model);
-    setDrawerOpen(false);
-    navigate("/");
+    navigate(`/b/${id}`);
   }
 
   // A new bot is simply the one you're now on; its page is in Bot Manager
@@ -108,8 +113,7 @@ export default function App({ me, onSignOut }: Props) {
     setBots((prev) => [...prev, bot]);
     rememberBot(bot.id);
     if (bot.model && models.some((m) => m.id === bot.model)) setSelectedModel(bot.model);
-    setDrawerOpen(false);
-    navigate("/");
+    navigate(`/b/${bot.id}`);
   }
 
   function refreshBalance() {
@@ -208,6 +212,10 @@ export default function App({ me, onSignOut }: Props) {
               refreshChats={refreshChats}
             />
           }
+        />
+        <Route
+          path="/b/:botId"
+          element={<BotStartPage bot={selectedBot} models={models} selectedModel={selectedModel} onSelectModel={setSelectedModel} onSend={handleStartSend} />}
         />
         <Route
           path="/c/:id"
