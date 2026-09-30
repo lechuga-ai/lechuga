@@ -68,11 +68,12 @@ function BotPanel({ bot, models, highlighted, onSaved, onDeleted, onPeople }: Pa
   const [name, setName] = useState(bot.name);
   const [model, setModel] = useState(bot.model ?? "");
   const [soul, setSoul] = useState(bot.soul);
+  const [guarded, setGuarded] = useState(bot.guarded === 1);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  const changed = name.trim() !== bot.name || soul !== bot.soul || (model || null) !== bot.model;
+  const changed = name.trim() !== bot.name || soul !== bot.soul || (model || null) !== bot.model || guarded !== (bot.guarded === 1);
   const current = models.filter((m) => !m.retired);
 
   async function submit(e: FormEvent) {
@@ -82,11 +83,12 @@ function BotPanel({ bot, models, highlighted, onSaved, onDeleted, onPeople }: Pa
     setError(null);
     setSaved(false);
     try {
-      const next = await saveBot(bot.id, { name: name.trim(), soul, model: model || null });
+      const next = await saveBot(bot.id, { name: name.trim(), soul, model: model || null, guarded });
       onSaved(next);
       setName(next.name);
       setSoul(next.soul);
       setModel(next.model ?? "");
+      setGuarded(next.guarded === 1);
       setSaved(true);
     } catch (err) {
       setError((err as Error).message);
@@ -140,6 +142,15 @@ function BotPanel({ bot, models, highlighted, onSaved, onDeleted, onPeople }: Pa
         <p className="settings-count">
           {soul.length.toLocaleString()} of {SOUL_MAX.toLocaleString()} characters.
         </p>
+        <label className="settings-check bot-guard-check">
+          <input type="checkbox" checked={guarded} onChange={(e) => setGuarded(e.target.checked)} disabled={busy} />
+          <span>
+            <b>Guarded.</b> Keeps everything it says suitable for a young person, whatever it's asked and however it's asked. Every message is checked
+            first: if someone brings up hurting themselves or others, or weapons, it stops, tells them to talk to a trusted adult, and emails you.
+            Explicit requests are refused. Web search is off, and it always thinks before answering. Works alongside how it behaves above; this has the
+            last word.
+          </span>
+        </label>
         {error && <p className="modal-error">{error}</p>}
         <div className="modal-actions">
           {saved && !changed && <span className="settings-saved">Saved.</span>}
@@ -337,6 +348,12 @@ function SharedBotPanel({ me, bot, highlighted, onLeft }: { me: Me; bot: Bot; hi
         {ownerName} can read every chat you have with {bot.name}, and can join in. The replies come out of their credits, not yours. Nothing you tell
         it is kept about you.
       </p>
+      {bot.guarded === 1 && (
+        <p>
+          <b>This bot is guarded.</b> It keeps everything suitable for a young person, can't search the web, and if a message brings up hurting
+          yourself or others, or weapons, it will tell you to talk to a trusted adult and let {ownerName} know.
+        </p>
+      )}
       {bot.soul && (
         <>
           <p className="settings-count">How {ownerName} has told it to behave:</p>

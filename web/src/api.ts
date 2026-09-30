@@ -160,6 +160,8 @@ export type Bot = {
   soul: string;
   model: string | null;
   is_default: number;
+  // The guard is on: locked prompt, every message checked, no web tools.
+  guarded: number;
   created_at: number;
   updated_at: number;
   role: "owner" | "member";
@@ -200,7 +202,7 @@ export async function getBot(id: string): Promise<{ bot: Bot; roster: BotRoster 
   return expectJson(await apiFetch(`/api/bots/${id}`));
 }
 
-export async function saveBot(id: string, patch: { name?: string; soul?: string; model?: string | null }): Promise<Bot> {
+export async function saveBot(id: string, patch: { name?: string; soul?: string; model?: string | null; guarded?: boolean }): Promise<Bot> {
   return expectJson(await postJson(`/api/bots/${id}`, patch, "PUT"));
 }
 

@@ -409,6 +409,18 @@ button {
   color: var(--box-dim);
 }
 
+/* The guard switch: a paragraph beside the box, not a one-liner. */
+.settings-form .bot-guard-check {
+  align-items: flex-start;
+  margin: 6px 0 18px;
+  max-width: 560px;
+  line-height: 1.45;
+}
+
+.settings-form .bot-guard-check input {
+  margin-top: 3px;
+}
+
 /* Sharing, at the foot of a bot's panel. */
 .bot-share {
   margin-top: 22px;

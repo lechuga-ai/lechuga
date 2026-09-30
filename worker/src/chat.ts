@@ -3,6 +3,7 @@ import { toolsFor } from "./tools";
 import { systemPrompt } from "./prompt";
 import { loadMemory, parseRemembered, rememberRequest, rememberTool, saveMemory } from "./memory";
 import { botAccess, botFor, defaultBot } from "./bots";
+import { checkMessage, fixedReplyStream, guardReply, recordGuardEvent } from "./guard";
 import { Hono } from "hono";
 import type { AppEnv, Env, BotRow, ChatRow, MessageRow } from "./types";
 import { streamChat, collectText, type ChatTurn } from "./gateway";
@@ -274,7 +275,9 @@ chat.post("/chats/:id/messages", async (c) => {
     return c.json({ error: `the attachments come to ${attachedChars.toLocaleString("en-US")} characters; the most one message can carry is ${LIMITS.attachment_chars.toLocaleString("en-US")}` }, 400);
   }
   // The composer's effort dropdown. Anything unexpected gets the default.
-  const effort = config.efforts.some((e) => e.id === body?.effort) ? (body.effort as string) : config.default_effort;
+  // A guarded bot thinks before it answers: low becomes medium.
+  const asked = config.efforts.some((e) => e.id === body?.effort) ? (body.effort as string) : config.default_effort;
+  const effort = bot.guarded && asked === "low" ? "medium" : asked;
   const content = composeMessage(typed, attachments);
   if (!content) return c.json({ error: "message is empty" }, 400);
   // All checked before anything is stored or sent to the model.
@@ -320,6 +323,34 @@ chat.post("/chats/:id/messages", async (c) => {
   // After a "compact this chat", only the summary and what came after it.
   const { kept: history, dropped } = trimHistory(sinceLastSummary(fullHistory));
   const names = await speakerNames(c.env, chatRow, bot);
+
+  // A guarded bot (guard.ts): the message is checked before the bot sees
+  // it. A hit gets a fixed reply instead of an answer, stored like one but
+  // costing nothing, a row in guard_events, and for the serious kinds an
+  // email to the bot's owner.
+  if (bot.guarded) {
+    const category = await checkMessage(c.env, [typed, ...attachments.filter((a) => !a.image).map((a) => a.text.slice(0, 1000))].join("\n"));
+    if (category) {
+      const people = await peopleByIds(c.env, [bot.user_id, userId]);
+      const ownerName = people.get(bot.user_id)?.name ?? "the person who set me up";
+      const text = guardReply(category, bot.name, ownerName);
+      await c.env.DB.batch([
+        c.env.DB.prepare(
+          "INSERT INTO messages (id, chat_id, role, content, model, prompt_tokens, completion_tokens, credits, created_at) VALUES (?, ?, 'assistant', ?, ?, 0, 0, 0, ?)"
+        ).bind(crypto.randomUUID(), chatId, text, chatRow.model, now + 1),
+        c.env.DB.prepare("UPDATE chats SET updated_at = ? WHERE id = ?").bind(now + 1, chatId),
+      ]);
+      c.executionCtx.waitUntil(
+        recordGuardEvent(c.env, { bot, chat: chatRow, userId, personName: people.get(userId)?.name ?? "Someone", category }).catch((err) => console.error("guard event failed", err))
+      );
+      if (!chatRow.title) c.executionCtx.waitUntil(generateTitle(c.env, chatId, typed || attachments.map((a) => a.name).join(", ")));
+      c.header("content-type", "text/event-stream");
+      c.header("cache-control", "no-cache");
+      c.header("connection", "keep-alive");
+      return c.body(fixedReplyStream(text));
+    }
+  }
+
   // What Lechuga remembers about the person (memory.ts) goes in only when
   // nobody else has ever been in the chat and the typist owns the bot. With
   // it comes the tool that adds to it. So nothing about a bot's owner
@@ -330,8 +361,9 @@ chat.post("/chats/:id/messages", async (c) => {
   const notice = dropped
     ? "This chat has grown long, so only its most recent part was sent to the model. Start a new chat if it loses the thread."
     : undefined;
-  const tools = withMemory ? [...toolsFor(c.env), rememberTool(userId)] : toolsFor(c.env);
-  const reply = runReply(c.env, chatRow.model, forModel(history, names, { model: chatRow.model, toolNames: tools.map((t) => t.name), bot, notes: withMemory ? memory.notes : null }), {
+  // A guarded bot has no tools: nothing from the web, nothing kept.
+  const tools = bot.guarded ? [] : withMemory ? [...toolsFor(c.env), rememberTool(userId)] : toolsFor(c.env);
+  const reply = runReply(c.env, chatRow.model, forModel(history, names, { model: chatRow.model, toolNames: tools.map((t) => t.name), bot, notes: withMemory ? memory.notes : null, guarded: bot.guarded === 1 }), {
     maxTokens: LIMITS.max_reply_tokens,
     effort,
     tools,
@@ -414,7 +446,7 @@ async function speakerNames(env: Env, chatRow: ChatRow, bot: BotRow): Promise<Ma
 function forModel(
   history: Turn[],
   names: Map<string, string> | null,
-  opts: { model: string; toolNames?: string[]; bot: { name: string; soul: string }; notes?: string | null }
+  opts: { model: string; toolNames?: string[]; bot: { name: string; soul: string }; notes?: string | null; guarded?: boolean }
 ): ChatTurn[] {
   const tagged = (m: Turn): string | ContentPart[] => {
     const content = modelContent(m.content);
@@ -429,7 +461,7 @@ function forModel(
         ? { role: "system", content: SUMMARY_PREAMBLE + summaryText(m.content) }
         : { role: "assistant", content: m.content }
   );
-  const system = systemPrompt({ model: opts.model, toolNames: opts.toolNames, bot: { name: opts.bot.name, soul: opts.bot.soul }, notes: opts.notes, shared: names !== null });
+  const system = systemPrompt({ model: opts.model, toolNames: opts.toolNames, bot: { name: opts.bot.name, soul: opts.bot.soul }, notes: opts.notes, shared: names !== null, guarded: opts.guarded });
   return [{ role: "system", content: system }, ...turns];
 }
 

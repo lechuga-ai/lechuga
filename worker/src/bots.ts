@@ -78,7 +78,7 @@ export async function listBots(env: Env, userId: string): Promise<BotView[]> {
 export async function defaultBot(env: Env, userId: string): Promise<BotRow> {
   const found = await env.DB.prepare("SELECT * FROM bots WHERE user_id = ? AND is_default = 1").bind(userId).first<BotRow>();
   if (found) return found;
-  const bot: BotRow = { id: crypto.randomUUID(), user_id: userId, name: DEFAULT_NAME, soul: "", model: null, is_default: 1, created_at: Date.now(), updated_at: Date.now() };
+  const bot: BotRow = { id: crypto.randomUUID(), user_id: userId, name: DEFAULT_NAME, soul: "", model: null, is_default: 1, guarded: 0, created_at: Date.now(), updated_at: Date.now() };
   await env.DB.prepare("INSERT INTO bots (id, user_id, name, soul, model, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)")
     .bind(bot.id, userId, bot.name, bot.soul, bot.model, bot.created_at, bot.updated_at)
     .run();
@@ -184,7 +184,7 @@ bots.post("/", async (c) => {
   await defaultBot(c.env, userId);
   const soul = await draftSoul(c.env, name);
   const now = Date.now();
-  const bot: BotView = { id: crypto.randomUUID(), user_id: userId, name, soul, model, is_default: 0, created_at: now, updated_at: now, role: "owner" };
+  const bot: BotView = { id: crypto.randomUUID(), user_id: userId, name, soul, model, is_default: 0, guarded: 0, created_at: now, updated_at: now, role: "owner" };
   await c.env.DB.prepare("INSERT INTO bots (id, user_id, name, soul, model, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)")
     .bind(bot.id, userId, name, soul, model, now, now)
     .run();
@@ -220,8 +220,11 @@ bots.put("/:id", async (c) => {
     if (!MODEL_IDS.has(body.model)) return c.json({ error: "that model isn't available" }, 400);
     next.model = body.model;
   }
+  if (typeof body?.guarded === "boolean") next.guarded = body.guarded ? 1 : 0;
   next.updated_at = Date.now();
-  await c.env.DB.prepare("UPDATE bots SET name = ?, soul = ?, model = ?, updated_at = ? WHERE id = ?").bind(next.name, next.soul, next.model, next.updated_at, bot.id).run();
+  await c.env.DB.prepare("UPDATE bots SET name = ?, soul = ?, model = ?, guarded = ?, updated_at = ? WHERE id = ?")
+    .bind(next.name, next.soul, next.model, next.guarded, next.updated_at, bot.id)
+    .run();
   return c.json({ ...next, role: "owner" });
 });
 
