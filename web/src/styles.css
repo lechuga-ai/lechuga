@@ -248,6 +248,54 @@ button {
   line-height: 1;
 }
 
+/* A bot's start page (/b/:botId): an empty chat with it, on the chat
+   background, everything gathered in the middle of the screen. */
+.bot-start {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 24px 56px;
+  background: var(--bg);
+  overflow-y: auto;
+}
+
+.bot-start-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.bot-start-head .avatar {
+  font-size: 24px;
+}
+
+.bot-start-name {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.bot-start-line {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-dim);
+}
+
+.bot-start .composer {
+  flex: 0 0 auto;
+  max-width: 680px;
+  margin-top: 12px;
+  padding: 0;
+}
+
 /* A bot in the list: a group with a bar down its left in the bot's colour,
    a header row (name, the faces once it's shared, the dots), and its chats. */
 .bot-group {
@@ -359,6 +407,66 @@ button {
   font-size: 12px;
   font-weight: 400;
   color: var(--box-dim);
+}
+
+/* Sharing, at the foot of a bot's panel. */
+.bot-share {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+/* The same panel as a dialog from the bot's dots: no rule above it. */
+.modal .bot-share {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.modal .bot-share h3 {
+  font-size: 18px;
+}
+
+.bot-share h3 {
+  margin: 0 0 10px;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.bot-share .modal-form {
+  display: flex;
+  gap: 8px;
+  max-width: 420px;
+}
+
+.bot-share .modal-form input {
+  flex: 1;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.bot-share .share-people {
+  max-height: none;
+}
+
+.bot-soul-quote {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-left: 3px solid var(--line);
+  white-space: pre-wrap;
+  font-family: var(--sans);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--box-dim);
+}
+
+/* In a chat with someone else's bot: who can see it. */
+.chat-bot-note {
+  opacity: 0.85;
 }
 
 .doc-inner .settings-lead {

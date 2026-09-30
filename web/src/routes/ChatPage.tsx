@@ -35,6 +35,8 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   const [messages, setMessages] = useState<Message[]>([]);
   const [chatModel, setChatModel] = useState(expectedModel);
   const [botName, setBotName] = useState(expectedBotName);
+  // Set when the chat is with someone else's bot: they can see it.
+  const [botOwner, setBotOwner] = useState<Person | null>(null);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [streamingReasoning, setStreamingReasoning] = useState("");
   const [streamingSteps, setStreamingSteps] = useState<Step[]>([]);
@@ -79,6 +81,7 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
         if (cancelled) return;
         setChatModel(chat.model);
         setBotName(bot.name);
+        setBotOwner(bot.owner);
         setMessages(history);
         setRole(myRole);
         setRoster(people);
@@ -204,9 +207,12 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   // Everyone who has ever typed here, for the names over their messages.
   // Only a chat that has been shared needs them.
   const people = useMemo(
-    () => (others.length > 0 || role === "member" ? new Map([owner, ...others].map((p) => [p.id, p])) : null),
+    () =>
+      others.length > 0 || role === "member" || botOwner
+        ? new Map([owner, ...others, ...(botOwner ? [botOwner] : [])].map((p) => [p.id, p]))
+        : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [roster, role]
+    [roster, role, botOwner]
   );
 
   // A shared chat asks every few seconds what the others have written. It
@@ -311,6 +317,11 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
         ownerId={owner.id}
         meId={me.id}
       />
+      {botOwner && (
+        <p className="chat-notice chat-bot-note">
+          {botName} is {botOwner.name}'s bot. {botOwner.name} can read this chat and join in, and its replies come out of their credits.
+        </p>
+      )}
       {notice && <p className="chat-notice">{notice}</p>}
       {remembering && <p className="chat-notice">Remembering: Lechuga is reading the chat and updating what it keeps about you…</p>}
       {(offerCompact || compacting) && (

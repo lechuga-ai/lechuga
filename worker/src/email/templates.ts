@@ -108,6 +108,19 @@ export function chatSharedEmail(opts: { sharerName: string; title: string | null
   };
 }
 
+export function botSharedEmail(opts: { sharerName: string; botName: string; url: string }): EmailContent {
+  return {
+    subject: `${opts.sharerName} shared their bot ${opts.botName} with you on Lechuga`,
+    text: [
+      `${opts.sharerName} shared a bot with you: ${opts.botName}.`,
+      "",
+      `You can chat with it from your list. ${opts.sharerName} can see every chat you have with it, and its replies come out of their credits, not yours.`,
+      "",
+      opts.url,
+    ].join("\n"),
+  };
+}
+
 export function requestReceivedEmail(): EmailContent {
   return {
     subject: "We got your request",

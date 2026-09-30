@@ -25,15 +25,22 @@ export type Roster = {
 export type ChatRole = "owner" | "member";
 
 // A chat that exists but isn't yours looks identical to one that doesn't
-// exist (null either way), so ids can't be probed.
+// exist (null either way), so ids can't be probed. Three ways in: it's
+// mine, I've been added to it, or it's with a bot I own (bots.ts): the
+// owner of a shared bot sees every chat with it, pays for them, and can do
+// everything its starter can.
 export async function chatAccess(env: Env, chatId: string, userId: string): Promise<{ chat: ChatRow; role: ChatRole } | null> {
   const chat = await env.DB.prepare(
-    `SELECT c.* FROM chats c WHERE c.id = ?1 AND (c.user_id = ?2 OR EXISTS (
-       SELECT 1 FROM chat_members m WHERE m.chat_id = c.id AND m.user_id = ?2 AND m.removed_at IS NULL))`
+    `SELECT c.* FROM chats c WHERE c.id = ?1 AND (c.user_id = ?2
+       OR EXISTS (SELECT 1 FROM chat_members m WHERE m.chat_id = c.id AND m.user_id = ?2 AND m.removed_at IS NULL)
+       OR EXISTS (SELECT 1 FROM bots b WHERE b.id = c.bot_id AND b.user_id = ?2))`
   )
     .bind(chatId, userId)
     .first<ChatRow>();
-  return chat ? { chat, role: chat.user_id === userId ? "owner" : "member" } : null;
+  if (!chat) return null;
+  if (chat.user_id === userId) return { chat, role: "owner" };
+  const ownsBot = chat.bot_id ? await env.DB.prepare("SELECT 1 AS one FROM bots WHERE id = ? AND user_id = ?").bind(chat.bot_id, userId).first() : null;
+  return { chat, role: ownsBot ? "owner" : "member" };
 }
 
 export async function peopleByIds(env: Env, ids: string[]): Promise<Map<string, Person>> {
@@ -75,14 +82,18 @@ export async function roster(env: Env, chat: ChatRow, forOwner: boolean): Promis
   };
 }
 
-// The sidebar's list: my chats and the ones I've been added to, newest first.
-// A shared chat carries its people (owner first) so the list can show faces.
+// The sidebar's list: my chats, the ones I've been added to, and every chat
+// with a bot I own, newest first. A shared chat carries its people (owner
+// first) so the list can show faces; so does a chat someone else started
+// with my bot, so I can see whose it is.
 export async function listChats(env: Env, userId: string): Promise<(ChatRow & { people?: Person[] })[]> {
   const [{ results: chats }, { results: memberRows }] = await Promise.all([
     env.DB.prepare(
       `SELECT c.* FROM chats c WHERE c.user_id = ?1
        UNION
        SELECT c.* FROM chats c JOIN chat_members m ON m.chat_id = c.id WHERE m.user_id = ?1 AND m.removed_at IS NULL
+       UNION
+       SELECT c.* FROM chats c JOIN bots b ON b.id = c.bot_id WHERE b.user_id = ?1 AND c.user_id != ?1
        ORDER BY updated_at DESC`
     )
       .bind(userId)
@@ -97,10 +108,11 @@ export async function listChats(env: Env, userId: string): Promise<(ChatRow & { 
       .bind(userId)
       .all<{ chat_id: string; user_id: string }>(),
   ]);
-  if (memberRows.length === 0) return chats;
-
   const membersOf = new Map<string, string[]>();
   for (const r of memberRows) membersOf.set(r.chat_id, [...(membersOf.get(r.chat_id) ?? []), r.user_id]);
+  // A chat someone else started with my bot: its starter is its face.
+  for (const c of chats) if (c.user_id !== userId && !membersOf.has(c.id)) membersOf.set(c.id, []);
+  if (membersOf.size === 0) return chats;
   const shared = chats.filter((c) => membersOf.has(c.id));
   const people = await peopleByIds(env, shared.flatMap((c) => [c.user_id, ...membersOf.get(c.id)!]));
   return chats.map((c) => {
