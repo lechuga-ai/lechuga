@@ -107,6 +107,9 @@ export function Sidebar({
   // they're with. A search looks across all of them.
   const seedId = bots.find((b) => b.is_default)?.id ?? null;
   const groups = bots.map((bot) => ({ bot, chats: chats.filter((c) => c.user_id === me.id && (c.bot_id ?? seedId) === bot.id) }));
+  // Never lose a chat: one whose bot isn't in the list (the bots didn't
+  // load, or a row points somewhere odd) still shows, under a plain heading.
+  const orphans = chats.filter((c) => c.user_id === me.id && !bots.some((b) => b.id === (c.bot_id ?? seedId)));
   const sharedWithMe = chats.filter((c) => c.user_id !== me.id);
 
   function chatRow(chat: Chat & { snippet?: string | null }) {
@@ -207,6 +210,14 @@ export function Sidebar({
               {own.map((chat) => chatRow(chat))}
             </div>
           ))}
+        {!searching && orphans.length > 0 && (
+          <div className="bot-group">
+            <div className="bot-row">
+              <span className="bot-row-name">Chats</span>
+            </div>
+            {orphans.map((chat) => chatRow(chat))}
+          </div>
+        )}
         {!searching && sharedWithMe.length > 0 && (
           <div className="bot-group shared">
             <div className="bot-row">
