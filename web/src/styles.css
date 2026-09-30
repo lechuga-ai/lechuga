@@ -368,6 +368,17 @@ button {
   border-top: 1px solid var(--line);
 }
 
+/* The same panel as a dialog from the bot's dots: no rule above it. */
+.modal .bot-share {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.modal .bot-share h3 {
+  font-size: 18px;
+}
+
 .bot-share h3 {
   margin: 0 0 10px;
   font-family: var(--sans);

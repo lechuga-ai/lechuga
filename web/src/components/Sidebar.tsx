@@ -5,6 +5,8 @@ import { searchChats, type Bot, type Chat, type ChatHit, type Me } from "../api"
 import { Avatar, AvatarStack, colourFor } from "./Avatar";
 import { InviteDialog } from "./InviteDialog";
 import { NewBotDialog } from "./NewBotDialog";
+import { BotShare } from "./BotManager";
+import type { Person } from "../api";
 import { Copyright } from "./SiteFooter";
 
 type Props = {
@@ -12,6 +14,8 @@ type Props = {
   // My bots, Seed first. Each is a group in the list with its chats.
   bots: Bot[];
   onBotCreated: (bot: Bot) => void;
+  // Who has a bot changed (the share dialog), so its faces follow.
+  onBotPeople: (botId: string, people: Person[] | undefined) => void;
   activeChatId: string | null;
   open: boolean;
   onSelect: (id: string) => void;
@@ -48,6 +52,7 @@ export function Sidebar({
   chats,
   bots,
   onBotCreated,
+  onBotPeople,
   activeChatId,
   open,
   onSelect,
@@ -60,8 +65,9 @@ export function Sidebar({
   const [now, setNow] = useState(() => Date.now());
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialog, setDialog] = useState<Dialog>("none");
-  // Which bot's dots are open, if any.
+  // Which bot's dots are open, if any; and which bot's share dialog.
   const [botMenu, setBotMenu] = useState<string | null>(null);
+  const [shareBot, setShareBot] = useState<Bot | null>(null);
   const [remaining, setRemaining] = useState(me.invitesRemaining);
   // The search box. While it has words in it the list below is the server's
   // answer (title or message text containing every word), each with a line
@@ -209,6 +215,18 @@ export function Sidebar({
                     >
                       New chat
                     </button>
+                    {bot.role === "owner" && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setBotMenu(null);
+                          setShareBot(bot);
+                        }}
+                      >
+                        Share…
+                      </button>
+                    )}
                     <Link to={`/settings/bots#${bot.id}`} role="menuitem" onClick={() => setBotMenu(null)}>
                       Bot Manager
                     </Link>
@@ -241,6 +259,20 @@ export function Sidebar({
           inside its 260px box. */}
       {dialog === "invite" &&
         createPortal(<InviteDialog onClose={() => setDialog("none")} onRemainingChange={setRemaining} />, document.body)}
+      {shareBot &&
+        createPortal(
+          <div className="modal-backdrop" onClick={() => setShareBot(null)}>
+            <div className="modal share-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+              <BotShare bot={shareBot} onPeople={(people) => onBotPeople(shareBot.id, people)} />
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShareBot(null)}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
       {dialog === "newBot" &&
         createPortal(
           <NewBotDialog

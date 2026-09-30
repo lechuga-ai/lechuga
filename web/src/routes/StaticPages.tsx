@@ -103,7 +103,7 @@ const NEWS: NewsEntry[] = [
       },
       {
         lead: "Share a bot.",
-        text: "At the foot of a bot in Bot Manager, add someone by username or email. They get the bot in their own list and their own chats with it; you see every one of those chats and can join in, and they're told so, on the bot and in each chat; the replies come out of your credits. Nothing they tell it is kept about them, and nothing Lechuga remembers about you reaches them. A member can leave from the same page.",
+        text: "Share…, in the dots beside a bot's name (or at the foot of the bot in Bot Manager): add someone by username or email. They get the bot in their own list and their own chats with it; you see every one of those chats and can join in, and they're told so, on the bot and in each chat; the replies come out of your credits. Nothing they tell it is kept about them, and nothing Lechuga remembers about you reaches them. A member can leave from the same page.",
       },
       {
         lead: "Three dots beside a bot's name.",

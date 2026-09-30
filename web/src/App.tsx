@@ -185,6 +185,7 @@ export default function App({ me, onSignOut }: Props) {
         chats={chats}
         bots={bots}
         onBotCreated={handleBotCreated}
+        onBotPeople={(botId, people) => setBots((prev) => prev.map((b) => (b.id === botId ? { ...b, people } : b)))}
         activeChatId={activeChatId}
         open={drawerOpen}
         onSelect={selectChat}

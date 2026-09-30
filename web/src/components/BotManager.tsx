@@ -161,7 +161,7 @@ function BotPanel({ bot, models, highlighted, onSaved, onDeleted, onPeople }: Pa
 // Who else has the bot. The owner adds people by username or email and
 // takes them out again; what sharing a bot means is spelled out, since it's
 // their credits and they'll be reading.
-function BotShare({ bot, onPeople }: { bot: Bot; onPeople: (people: Person[] | undefined) => void }) {
+export function BotShare({ bot, onPeople }: { bot: Bot; onPeople: (people: Person[] | undefined) => void }) {
   const [roster, setRoster] = useState<BotRoster | null>(null);
   const [who, setWho] = useState("");
   const [busy, setBusy] = useState(false);
