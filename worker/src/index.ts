@@ -8,6 +8,7 @@ import { accessRequests, feedbackRequests, notes } from "./requests";
 import { admin } from "./admin";
 import { avatars, me } from "./me";
 import { memory } from "./memory";
+import { bots } from "./bots";
 import { nightly } from "./nightly";
 import { sharing } from "./sharing";
 import { billing } from "./billing";
@@ -85,6 +86,7 @@ app.use("/api/*", async (c, next) => {
 
 app.route("/api/me", me);
 app.route("/api/memory", memory);
+app.route("/api/bots", bots);
 app.route("/api/avatars", avatars);
 app.route("/api/invites", invites);
 app.route("/api/notes", notes);

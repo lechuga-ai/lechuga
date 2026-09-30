@@ -8,7 +8,8 @@ This repository is everything behind it: one Cloudflare Worker, one React app, o
 
 - Chat with open source models through Workers AI, with the model's reasoning shown as it happens and replies streamed. An effort setting per message (low skips the thinking; medium is the default).
 - Attach files and pictures: pastes and drops become chiclets, PDFs and Office files are converted to text on the server, pictures go to a model with vision. Long chats can be compacted into a summary.
-- A memory: two short notes per person (what to remember, and how to be with them) that go into the model's instructions in their own chats, never a shared one. Written by "Remember this chat", by the model's `remember` tool when asked, by an overnight pass (a cron trigger) that folds in the day's chats, or by hand under Account. The system prompt itself lives in one file, `worker/src/prompt.ts`.
+- Bots: every account starts with one, Seed, and makes more by naming them; the model drafts a first "soul" (what the bot is for and how it talks) from the name, which the person rewrites. Every chat is with a bot, and a bot can have its own model.
+- A memory: one short note per person (what to remember about them) that goes into the model's instructions in their own chats, never a shared one. Written by "Remember this chat" (which also updates the bot's soul), by the model's `remember` tool when asked, by an overnight pass (a cron trigger) that folds in the day's chats, or by hand under Account. The system prompt itself lives in one file, `worker/src/prompt.ts`.
 - The model can search the web (Brave) and read pages while it answers, when it decides it needs to; each step shows above the reply with links to what it read. Searches are charged to the chat at a published price.
 - Share a chat with people by username or email: they read all of it and can carry it on, every message carries who typed it, and the replies are charged to whoever started the chat. Profiles with a name and a photo.
 - Invite-only accounts: magic-link or Google sign-in, a username chosen once, five invites each, a request-access form.
@@ -30,6 +31,7 @@ worker/                  Hono API + static assets, Wrangler config
     index.ts             entry: public routes, then the session check, then private routes
     auth.ts              Better Auth setup and the invite gate
     chat.ts              chats and messages: limits, history trimming, charging, "remember this chat"
+    bots.ts              bots: Seed and the ones people make; the soul drafted from a name
     prompt.ts            the system prompt: who Lechuga is, what it can do, how to be, what it remembers
     memory.ts            what Lechuga keeps about a person across chats, and the model's remember tool
     nightly.ts           the overnight pass that folds the day's private chats into memory (cron in wrangler.toml)

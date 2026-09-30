@@ -85,10 +85,27 @@ export type AppConfig = {
   terms_version: string;
 };
 
+// A bot (migration 0013): whose it is, what it's called, how it talks, and
+// the model its new chats start on (null: the default). is_default marks
+// Seed, the one every account has.
+export type BotRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  soul: string;
+  model: string | null;
+  is_default: number;
+  created_at: number;
+  updated_at: number;
+};
+
 export type ChatRow = {
   id: string;
   user_id: string;
   project_id: string | null;
+  // The bot the chat is with. Null only on a row from before bots, which
+  // botFor() reads as the owner's Seed.
+  bot_id: string | null;
   title: string | null;
   model: string;
   created_at: number;

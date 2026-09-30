@@ -215,15 +215,158 @@ button {
   display: block;
 }
 
-.new-chat-btn {
-  background: var(--accent);
-  color: #ffffff;
+/* "+ New bot", under the search box: quiet, the opposite of New chat. */
+.new-bot-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  margin-bottom: 14px;
   border: none;
-  border-radius: 10px;
-  padding: 9px 14px;
-  font-size: 13px;
+  border-radius: 9px;
+  background: none;
+  color: #5f6659;
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.new-bot-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #1e221b;
+}
+
+.new-bot-plus {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px dashed #98a092;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* A bot in the list: a group with a bar down its left in the bot's colour,
+   a header row (name, the faces once it's shared, the dots), and its chats. */
+.bot-group {
+  border-left: 3px solid #c9cfc3;
+  padding-left: 6px;
+  margin: 0 0 12px 2px;
+}
+
+.bot-group.shared {
+  border-left-style: dashed;
+}
+
+.bot-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 8px;
+  color: #1e221b;
+  font-size: 13.5px;
   font-weight: 600;
+}
+
+.bot-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bot-row-dots {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: #98a092;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.bot-row:hover .bot-row-dots,
+.bot-row-dots[aria-expanded="true"] {
+  color: #1e221b;
+}
+
+.bot-row-dots:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.bot-row-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 2px);
+  z-index: 5;
+  min-width: 150px;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  background: var(--box);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  font-weight: 400;
+}
+
+.bot-row-menu button,
+.bot-row-menu a {
+  display: block;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--box-text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.bot-row-menu button:hover,
+.bot-row-menu a:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+/* Bot Manager: a panel per bot; the one the three-dots menu asked for is marked. */
+.bot-panel {
   margin-bottom: 18px;
+  scroll-margin-top: 90px;
+}
+
+.bot-panel.highlighted {
+  border-color: rgba(111, 174, 59, 0.7);
+  box-shadow: 0 0 0 3px rgba(111, 174, 59, 0.18);
+}
+
+.bot-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 14px;
+  font-family: var(--sans);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.bot-panel-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--box-dim);
+}
+
+.doc-inner .settings-lead {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--box-dim);
+  margin: 0 0 16px;
 }
 
 .chat-list {
@@ -280,7 +423,7 @@ button {
 
 .chat-search {
   width: 100%;
-  margin: -8px 0 10px;
+  margin: 0 0 12px;
   padding: 7px 10px;
   border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 9px;
@@ -4079,6 +4222,17 @@ button {
 .settings-form textarea:focus {
   outline: none;
   border-color: rgba(111, 174, 59, 0.6);
+}
+
+.settings-form .settings-select {
+  display: block;
+  max-width: 360px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font: inherit;
+  font-size: 14px;
 }
 
 .settings-form .settings-check {

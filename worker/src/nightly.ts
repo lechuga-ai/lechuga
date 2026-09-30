@@ -4,13 +4,14 @@ import { accountState, costUsdFor, creditsEnforced, creditsFor, estimateTokens, 
 import { splitMessage } from "./attachments";
 import { loadMemory, parseRemembered, rememberRequest, saveMemory } from "./memory";
 import { systemPrompt } from "./prompt";
+import { defaultBot } from "./bots";
 import config from "../config.json";
 
 // The overnight memory pass. Once a night (a cron trigger in wrangler.toml,
 // index.ts's scheduled handler) Lechuga reads what each person said in their
-// own chats since it last looked, and folds anything lasting into their notes
-// and soul (memory.ts), the same rewrite "Remember this chat" does but
-// unasked and told to be conservative. So memory fills in on its own for
+// own chats since it last looked, and folds anything lasting into their
+// notes (memory.ts), the same rewrite "Remember this chat" does but unasked,
+// notes only, and told to be conservative. So memory fills in on its own for
 // people who never press the button.
 //
 // Only private chats, only the typed text (attachments are documents, not
@@ -87,10 +88,14 @@ async function trainOne(env: Env, userId: string, now: number): Promise<boolean>
   const transcript = transcriptOf(rows);
   if (!transcript) return false;
 
+  // Notes only: what a bot is like is set on the bot, not learned overnight.
+  // The person's Seed is the voice asking, since the chats may be with any
+  // of their bots.
+  const seed = await defaultBot(env, userId);
   const request =
     `Here is what I said in my own chats since you last looked, newest chat first. Some of it is passing; treat it that way.\n\n${transcript.text}\n\n` +
-    rememberRequest(memory, "overnight");
-  const upstream = await streamChat(env, MODEL, [{ role: "system", content: systemPrompt({ model: MODEL, memory }) }, { role: "user", content: request }], {
+    rememberRequest({ notes: memory.notes, soul: "" }, "overnight", "notes");
+  const upstream = await streamChat(env, MODEL, [{ role: "system", content: systemPrompt({ model: MODEL, bot: { name: seed.name, soul: "" }, notes: memory.notes }) }, { role: "user", content: request }], {
     maxTokens: config.limits.remember_tokens,
     effort: "low",
   });
@@ -114,7 +119,7 @@ async function trainOne(env: Env, userId: string, now: number): Promise<boolean>
       note: "training",
     })
   );
-  await saveMemory(env, userId, { ...parseRemembered(written, memory), trainedAt: now });
+  await saveMemory(env, userId, { notes: parseRemembered(written, { notes: memory.notes, soul: "" }).notes, trainedAt: now });
   return true;
 }
 

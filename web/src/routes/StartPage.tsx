@@ -9,6 +9,8 @@ import type { Attachment } from "../../../worker/src/attachments";
 
 type Props = {
   models: Model[];
+  // The bot the chat will be with, for the box.
+  botName: string;
   selectedModel: string;
   onSelectModel: (id: string) => void;
   // Creates the chat and navigates to /c/:id where the reply streams.
@@ -19,10 +21,12 @@ type Props = {
 // The signed-in "/" view: the wordmark over the photo and one box to type in.
 // If the visitor typed a message before signing in, that message is waiting;
 // start it now.
-export function StartPage({ models, selectedModel, onSelectModel, onSend, refreshChats }: Props) {
+export function StartPage({ models, botName, selectedModel, onSelectModel, onSend, refreshChats }: Props) {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
-  const placeholder = useMemo(randomEmptyLine, []);
+  // Seed keeps the old lines; another bot is addressed by name.
+  const emptyLine = useMemo(randomEmptyLine, []);
+  const placeholder = botName === "Seed" ? emptyLine : `message ${botName}`;
   const tagline = useMemo(heroTagline, []);
   const startedRef = useRef(false);
 

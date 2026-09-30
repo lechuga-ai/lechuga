@@ -5,7 +5,17 @@ import { StartPage } from "./routes/StartPage";
 import { ChatPage } from "./routes/ChatPage";
 import { setStartMessage } from "./startMessage";
 import type { Attachment } from "../../worker/src/attachments";
-import { createChat, deleteChat, getMe, listChats, listModels, removeChatMember, type Chat, type Me, type Model } from "./api";
+import { createChat, deleteChat, getMe, listBots, listChats, listModels, removeChatMember, type Bot, type Chat, type Me, type Model } from "./api";
+
+// The bot picked last time, so a reload lands where you were.
+const BOT_KEY = "lechuga.bot";
+function readBotKey(): string | null {
+  try {
+    return localStorage.getItem(BOT_KEY);
+  } catch {
+    return null;
+  }
+}
 
 type Props = {
   me: Me;
@@ -18,6 +28,9 @@ export default function App({ me, onSignOut }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const [chats, setChats] = useState<Chat[]>([]);
+  // My bots, Seed first, and the one the sidebar and the start page are on.
+  const [bots, setBots] = useState<Bot[]>([]);
+  const [selectedBotId, setSelectedBotId] = useState<string | null>(readBotKey);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [models, setModels] = useState<Model[]>([]);
   const [selectedModel, setSelectedModel] = useState("");
@@ -29,6 +42,7 @@ export default function App({ me, onSignOut }: Props) {
 
   useEffect(() => {
     listChats().then(setChats).catch(() => setChats([]));
+    listBots().then(setBots).catch(() => setBots([]));
     listModels()
       .then((m) => {
         setModels(m);
@@ -66,6 +80,38 @@ export default function App({ me, onSignOut }: Props) {
     );
   }
 
+  // The selected bot, falling back to Seed when the remembered one is gone.
+  const selectedBot = bots.find((b) => b.id === selectedBotId) ?? bots[0] ?? null;
+
+  function rememberBot(id: string) {
+    setSelectedBotId(id);
+    try {
+      localStorage.setItem(BOT_KEY, id);
+    } catch {
+      // fine without
+    }
+  }
+
+  // Switching bots in the sidebar: the list becomes its chats and "/" starts
+  // one with it, on its own model if it has one.
+  function selectBot(id: string) {
+    rememberBot(id);
+    const bot = bots.find((b) => b.id === id);
+    if (bot?.model && models.some((m) => m.id === bot.model)) setSelectedModel(bot.model);
+    setDrawerOpen(false);
+    navigate("/");
+  }
+
+  // A new bot is simply the one you're now on; its page is in Bot Manager
+  // when wanted, not forced.
+  function handleBotCreated(bot: Bot) {
+    setBots((prev) => [...prev, bot]);
+    rememberBot(bot.id);
+    if (bot.model && models.some((m) => m.id === bot.model)) setSelectedModel(bot.model);
+    setDrawerOpen(false);
+    navigate("/");
+  }
+
   function refreshBalance() {
     getMe()
       .then((m) => setBalance(m.balance))
@@ -74,12 +120,16 @@ export default function App({ me, onSignOut }: Props) {
 
   function selectChat(id: string) {
     setDrawerOpen(false);
+    // The sidebar follows the chat to its bot, so New chat and the list
+    // are the same bot's. A chat shared with me is with someone else's bot.
+    const chat = chats.find((c) => c.id === id);
+    if (chat && chat.user_id === me.id && chat.bot_id && chat.bot_id !== selectedBot?.id) rememberBot(chat.bot_id);
     navigate(`/c/${id}`);
   }
 
-  function handleNewChat() {
-    setDrawerOpen(false);
-    navigate("/");
+  // From a bot's dots in the sidebar: the start page, with that bot.
+  function handleNewChat(botId: string) {
+    selectBot(botId);
   }
 
   // The ✕ beside a chat. On my own chat it deletes it, for everyone in it; on
@@ -114,7 +164,7 @@ export default function App({ me, onSignOut }: Props) {
   // The start composer: create the chat, hand its first message to the chat
   // page, and move to /c/:id where the reply streams in.
   async function handleStartSend(content: string, model?: string, attachments: Attachment[] = []) {
-    const { id } = await createChat(model || selectedModel);
+    const { id } = await createChat(model || selectedModel, selectedBot?.id);
     await refreshChats();
     setStartMessage(id, content, attachments);
     navigate(`/c/${id}`);
@@ -132,6 +182,8 @@ export default function App({ me, onSignOut }: Props) {
       {drawerOpen && <div className="drawer-backdrop" onClick={() => setDrawerOpen(false)} />}
       <Sidebar
         chats={chats}
+        bots={bots}
+        onBotCreated={handleBotCreated}
         activeChatId={activeChatId}
         open={drawerOpen}
         onSelect={selectChat}
@@ -147,6 +199,7 @@ export default function App({ me, onSignOut }: Props) {
           element={
             <StartPage
               models={models}
+              botName={selectedBot?.name ?? "Seed"}
               selectedModel={selectedModel}
               onSelectModel={setSelectedModel}
               onSend={handleStartSend}
@@ -161,6 +214,7 @@ export default function App({ me, onSignOut }: Props) {
               me={me}
               models={models}
               expectedModel={selectedModel}
+              expectedBotName={selectedBot?.name ?? "Seed"}
               onFirstMessage={handleFirstMessage}
               refreshChats={refreshChats}
               refreshBalance={refreshBalance}

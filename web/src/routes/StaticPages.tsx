@@ -84,6 +84,34 @@ type NewsEntry = { date: string; title: string; intro: string; items: { lead: st
 
 const NEWS: NewsEntry[] = [
   {
+    date: "September 29, 2026",
+    title: "Bots",
+    intro:
+      "Until now there was one Lechuga, and every chat was with it. Now there are bots: you make them, name them, and tell them what they're for. Every chat is with one of them.",
+    items: [
+      {
+        lead: "Seed.",
+        text: "The bot every account starts with. All your chats so far are with it, and whatever you'd written about how Lechuga should talk to you is now how Seed behaves. It's the one that can't be deleted.",
+      },
+      {
+        lead: "Name one and it knows what it's for.",
+        text: "New bot, at the top on the left, asks one thing: what you'd like to name it. Think of it as hiring someone for one job, and name it for the job. Lechuga works out from the name alone how the bot should behave (try Penny Pincher, or Sous Chef), and you're chatting with it straight away.",
+      },
+      {
+        lead: "Each bot has its own chats.",
+        text: "On the left, every bot is a group with a bar down its side in its own colour, its name at the top and its chats underneath. Chats people have shared with you sit at the bottom, and the search box at the top looks across everything.",
+      },
+      {
+        lead: "Three dots beside a bot's name.",
+        text: "New chat starts one with that bot. Bot Manager is a page under Account with every bot on it: its name, the model its new chats start on, and how it behaves, which you can rewrite from scratch. From the dots it lands on that bot.",
+      },
+      {
+        lead: "Memory is yours; the soul is the bot's.",
+        text: "What Lechuga remembers about you stays one note under Account, shared by all your bots. How a bot behaves lives on the bot's page. Remember, in a chat, still updates both; the overnight pass now touches only the note about you.",
+      },
+    ],
+  },
+  {
     date: "September 28, 2026",
     title: "Lechuga remembers",
     intro:
@@ -91,7 +119,7 @@ const NEWS: NewsEntry[] = [
     items: [
       {
         lead: "A memory, in two notes.",
-        text: "What to remember about you (what you're working on, what you like) and how to be with you (short answers, no bullet points, whatever you'd want). Both live under Account, then Memory, where you can read them, rewrite them, switch them off, or wipe them. They go with every message in your own chats and never in a shared one, so they cost a few credits a message while they're not empty.",
+        text: "About you (what you're working on, what you like) and how Lechuga should talk to you (short answers, no bullet points, whatever you'd want). Both live under Account, then Memory, where you can read them, rewrite them, switch them off, or wipe them. They go with every message in your own chats and never in a shared one, so they cost a few credits a message while they're not empty.",
       },
       {
         lead: "Remember, beside Share.",
