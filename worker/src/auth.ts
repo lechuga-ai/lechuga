@@ -7,6 +7,7 @@ import { acceptInvite, hasAccount, normalizeEmail, pendingInviteFor } from "./in
 import { applyOnce } from "./credits";
 import { passesBotCheck } from "./turnstile";
 import { claimPendingShares } from "./sharing";
+import { claimPendingBotShares } from "./bots";
 import config from "../config.json";
 import { APP_ORIGINS } from "./native-app";
 
@@ -128,8 +129,9 @@ export function createAuth(env: Env) {
           after: async (user) => {
             const email = normalizeEmail(user.email);
             if (email) await acceptInvite(env, user.id, email);
-            // Chats shared with this address before it had an account.
+            // Chats, and bots, shared with this address before it had an account.
             if (email) await claimPendingShares(env, user.id, email);
+            if (email) await claimPendingBotShares(env, user.id, email);
             // Starter credits. Keyed by user id, so it can only land once.
             await applyOnce(env, { userId: user.id, delta: config.starter_credits, reason: "signup_bonus", ref: user.id });
           },

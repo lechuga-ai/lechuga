@@ -136,7 +136,8 @@ export default function App({ me, onSignOut }: Props) {
   // one shared with me it only takes me out.
   async function handleDelete(id: string) {
     const target = chats.find((c) => c.id === id);
-    const mine = !target || target.user_id === me.id;
+    // Mine to delete: I started it, or it's with a bot I own.
+    const mine = !target || target.user_id === me.id || bots.some((b) => b.id === target.bot_id && b.role === "owner");
     if (mine && target?.people && !window.confirm("Delete this chat? It's shared, and it will be gone for everyone in it.")) return;
     if (!mine && !window.confirm("Leave this chat? It will disappear from your list. What you wrote stays in it.")) return;
     try {

@@ -106,11 +106,17 @@ export function Sidebar({
   // Seed's); then the ones others have shared with me, whichever bot
   // they're with. A search looks across all of them.
   const seedId = bots.find((b) => b.is_default)?.id ?? null;
-  const groups = bots.map((bot) => ({ bot, chats: chats.filter((c) => c.user_id === me.id && (c.bot_id ?? seedId) === bot.id) }));
+  // Under a bot I own: every chat with it, mine and (with their face) the
+  // ones people I've shared it with started. Under a bot shared with me:
+  // my own chats with it.
+  const botOf = (c: Chat) => bots.find((b) => b.id === (c.bot_id ?? seedId)) ?? null;
+  const inGroup = (c: Chat, bot: Bot) => botOf(c)?.id === bot.id && (c.user_id === me.id || bot.role === "owner");
+  const groups = bots.map((bot) => ({ bot, chats: chats.filter((c) => inGroup(c, bot)) }));
   // Never lose a chat: one whose bot isn't in the list (the bots didn't
   // load, or a row points somewhere odd) still shows, under a plain heading.
-  const orphans = chats.filter((c) => c.user_id === me.id && !bots.some((b) => b.id === (c.bot_id ?? seedId)));
-  const sharedWithMe = chats.filter((c) => c.user_id !== me.id);
+  const orphans = chats.filter((c) => c.user_id === me.id && botOf(c) === null);
+  // Chats others started and let me into, one at a time.
+  const sharedWithMe = chats.filter((c) => c.user_id !== me.id && !bots.some((b) => inGroup(c, b)));
 
   function chatRow(chat: Chat & { snippet?: string | null }) {
     return (
@@ -176,6 +182,8 @@ export function Sidebar({
             <div key={bot.id} className="bot-group" style={{ borderLeftColor: colourFor(bot.id) }}>
               <div className="bot-row">
                 <span className="bot-row-name">{bot.name}</span>
+                {/* Once shared: everyone with it, the owner ringed. */}
+                {bot.people && <AvatarStack people={bot.people} ownerId={bot.user_id} size={16} max={3} />}
                 <button
                   type="button"
                   className="bot-row-dots"

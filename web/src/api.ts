@@ -143,12 +143,16 @@ export async function createChat(model?: string, bot?: string): Promise<{ id: st
   );
 }
 
-export async function getChat(id: string): Promise<{ chat: Chat; messages: Message[]; role: "owner" | "member"; roster: Roster; bot: { id: string; name: string } }> {
+// bot.owner is set when the chat is with someone else's bot: they can see it.
+export async function getChat(
+  id: string
+): Promise<{ chat: Chat; messages: Message[]; role: "owner" | "member"; roster: Roster; bot: { id: string; name: string; owner: Person | null } }> {
   return expectJson(await apiFetch(`/api/chats/${id}`));
 }
 
-// Bots (worker/src/bots.ts): a name, a soul, a model, all mine. Seed is the
-// one every account has (is_default).
+// Bots (worker/src/bots.ts): a name, a soul, a model, and an owner. Seed is
+// the one every account has (is_default). role says whether it's mine or
+// shared with me; people (owner first) is everyone with it once shared.
 export type Bot = {
   id: string;
   user_id: string;
@@ -158,10 +162,33 @@ export type Bot = {
   is_default: number;
   created_at: number;
   updated_at: number;
+  role: "owner" | "member";
+  people?: Person[];
+};
+
+export type BotRoster = {
+  owner: Person;
+  members: (Person & { removed: boolean })[];
+  pending: { id: string; email: string }[];
 };
 
 export async function listBots(): Promise<Bot[]> {
   return expectJson(await apiFetch("/api/bots"));
+}
+
+// Share a bot with a username or an email address; the same needs_invite
+// dance as addChatMember.
+export async function addBotMember(botId: string, who: string, useInvite = false): Promise<{ roster: BotRoster; waitingFor?: string }> {
+  return expectJson(await postJson(`/api/bots/${botId}/members`, { who, useInvite }));
+}
+
+// The owner removing someone, or (with your own id) leaving.
+export async function removeBotMember(botId: string, userId: string): Promise<{ roster?: BotRoster }> {
+  return expectJson(await apiFetch(`/api/bots/${botId}/members/${userId}`, { method: "DELETE" }));
+}
+
+export async function cancelBotPendingShare(botId: string, pendingId: string): Promise<{ roster: BotRoster }> {
+  return expectJson(await apiFetch(`/api/bots/${botId}/pending/${pendingId}`, { method: "DELETE" }));
 }
 
 // Takes a few seconds: the worker has the model draft a soul from the name.
@@ -169,7 +196,7 @@ export async function createBot(name: string): Promise<Bot> {
   return expectJson(await postJson("/api/bots", { name }));
 }
 
-export async function getBot(id: string): Promise<Bot> {
+export async function getBot(id: string): Promise<{ bot: Bot; roster: BotRoster }> {
   return expectJson(await apiFetch(`/api/bots/${id}`));
 }
 

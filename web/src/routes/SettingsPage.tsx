@@ -53,7 +53,7 @@ export function SettingsPage({ me, onMeChange }: Props) {
       ) : page === "Memory" ? (
         <MemoryForm />
       ) : page === "Bot Manager" ? (
-        <BotManager bots={bots} onBotsChange={setBots} />
+        <BotManager me={me} bots={bots} onBotsChange={setBots} />
       ) : (
         <ProfileForm me={me} onSaved={(profile) => onMeChange({ ...me, ...profile })} />
       )}

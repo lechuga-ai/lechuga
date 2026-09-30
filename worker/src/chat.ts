@@ -2,9 +2,9 @@ import { runReply } from "./reply";
 import { toolsFor } from "./tools";
 import { systemPrompt } from "./prompt";
 import { loadMemory, parseRemembered, rememberRequest, rememberTool, saveMemory } from "./memory";
-import { botFor, defaultBot, myBot } from "./bots";
+import { botAccess, botFor, defaultBot } from "./bots";
 import { Hono } from "hono";
-import type { AppEnv, Env, ChatRow, MessageRow } from "./types";
+import type { AppEnv, Env, BotRow, ChatRow, MessageRow } from "./types";
 import { streamChat, collectText, type ChatTurn } from "./gateway";
 import { accountState, costUsdFor, creditsEnforced, creditsFor, estimateTokens, ledgerStatements } from "./credits";
 import { composeMessage, estimateMessageTokens, looksLikeImage, looksLikeText, modelContent, splitMessage, type Attachment, type ContentPart } from "./attachments";
@@ -47,7 +47,7 @@ async function recentActivity(env: Env, senderId: string, payerId: string): Prom
     ).bind(senderId, startOfDay, now - 60_000),
     env.DB.prepare(
       `SELECT COUNT(*) AS inFlight FROM messages m JOIN chats c ON c.id = m.chat_id
-       WHERE c.user_id = ?1 AND m.role = 'user' AND m.created_at >= ?2 AND NOT EXISTS (
+       WHERE (c.user_id = ?1 OR c.bot_id IN (SELECT id FROM bots WHERE user_id = ?1)) AND m.role = 'user' AND m.created_at >= ?2 AND NOT EXISTS (
          SELECT 1 FROM messages a WHERE a.chat_id = m.chat_id AND a.role = 'assistant' AND a.created_at > m.created_at)`
     ).bind(payerId, now - IN_FLIGHT_WINDOW_MS),
   ]);
@@ -126,13 +126,14 @@ chat.get("/chats/search", async (c) => {
   return c.json(matches);
 });
 
-// A new chat, with one of my bots (bots.ts): the one asked for, or Seed.
-// The model is the one asked for, else the bot's, else the default; the
-// chat keeps it from here on.
+// A new chat, with a bot I own or have been let into (bots.ts): the one
+// asked for, or Seed. The model is the one asked for, else the bot's, else
+// the default; the chat keeps it from here on. The chat is mine (I started
+// it) even when the bot is someone else's; they pay for it and can see it.
 chat.post("/chats", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const userId = c.get("userId");
-  const bot = (typeof body?.bot === "string" && (await myBot(c.env, userId, body.bot))) || (await defaultBot(c.env, userId));
+  const bot = (typeof body?.bot === "string" && (await botAccess(c.env, body.bot, userId))?.bot) || (await defaultBot(c.env, userId));
   const model = MODEL_IDS.has(body?.model) ? body.model : bot.model && MODEL_IDS.has(bot.model) ? bot.model : DEFAULT_MODEL;
 
   const id = crypto.randomUUID();
@@ -203,8 +204,11 @@ chat.get("/chats/:id", async (c) => {
     roster(c.env, access.chat, access.role === "owner"),
     botFor(c.env, access.chat),
   ]);
-  // Of the bot, only what anyone in the chat may see: its soul is its owner's.
-  return c.json({ chat: access.chat, messages: results, role: access.role, roster: people, bot: { id: bot.id, name: bot.name } });
+  // Of the bot, only what anyone in the chat may see: its soul is its
+  // owner's. When the chat is with someone else's bot, who that is, so the
+  // page can say they see it.
+  const botOwner = bot.user_id !== access.chat.user_id ? (await peopleByIds(c.env, [bot.user_id])).get(bot.user_id) ?? null : null;
+  return c.json({ chat: access.chat, messages: results, role: access.role, roster: people, bot: { id: bot.id, name: bot.name, owner: botOwner } });
 });
 
 // Deleting is the owner's, and takes the chat away from everyone in it. A
@@ -229,11 +233,14 @@ chat.post("/chats/:id/messages", async (c) => {
   const access = await chatAccess(c.env, chatId, userId);
   if (!access) return c.json({ error: "not found" }, 404);
   const chatRow = access.chat;
-  // Whoever typed, the chat's payer is charged for the reply. Today that's
-  // always its owner; it's named apart so a chat can one day be paid for by
-  // someone else (a public chat, by Lechuga).
-  const payerId = chatRow.user_id;
-  const mine = access.role === "owner";
+  const bot = await botFor(c.env, chatRow);
+  // Whoever typed, the bot's owner pays for the reply: the chat's own owner
+  // in the usual case, and the bot's owner when someone chats with a bot
+  // shared with them. Named apart so a chat can one day be paid for by
+  // someone else again (a public chat, by Lechuga). mine: the payer is me,
+  // so an empty balance is mine to fill.
+  const payerId = bot.user_id;
+  const mine = payerId === userId;
 
   const body = await c.req.json().catch(() => null);
   const typed = typeof body?.content === "string" ? body.content.trim() : "";
@@ -312,12 +319,12 @@ chat.post("/chats/:id/messages", async (c) => {
     .all<Turn>();
   // After a "compact this chat", only the summary and what came after it.
   const { kept: history, dropped } = trimHistory(sinceLastSummary(fullHistory));
-  const [names, bot] = await Promise.all([speakerNames(c.env, chatRow), botFor(c.env, chatRow)]);
+  const names = await speakerNames(c.env, chatRow, bot);
   // What Lechuga remembers about the person (memory.ts) goes in only when
-  // nobody else has ever been in the chat, so names is null and the typist
-  // is the owner, of the chat and so of its bot. With it comes the tool
-  // that adds to it.
-  const memory = names ? null : await loadMemory(c.env, userId);
+  // nobody else has ever been in the chat and the typist owns the bot. With
+  // it comes the tool that adds to it. So nothing about a bot's owner
+  // reaches someone it's shared with, and nothing about them is kept.
+  const memory = names === null && userId === bot.user_id ? await loadMemory(c.env, userId) : null;
   const withMemory = memory !== null && memory.enabled;
 
   const notice = dropped
@@ -387,11 +394,13 @@ chat.post("/chats/:id/messages", async (c) => {
 type Turn = { role: "user" | "assistant"; content: string; user_id: string | null };
 
 // In a chat that has ever been shared, who each person is, so the model can
-// be told who's talking. Null for a chat that's only ever had its owner.
-async function speakerNames(env: Env, chatRow: ChatRow): Promise<Map<string, string> | null> {
+// be told who's talking. Null for a chat that's only ever had its owner. A
+// chat someone started with a bot they were let into counts as shared: the
+// bot's owner can see it and join in.
+async function speakerNames(env: Env, chatRow: ChatRow, bot: BotRow): Promise<Map<string, string> | null> {
   const { results } = await env.DB.prepare("SELECT user_id FROM chat_members WHERE chat_id = ?").bind(chatRow.id).all<{ user_id: string }>();
-  if (results.length === 0) return null;
-  const people = await peopleByIds(env, [chatRow.user_id, ...results.map((r) => r.user_id)]);
+  if (results.length === 0 && chatRow.user_id === bot.user_id) return null;
+  const people = await peopleByIds(env, [chatRow.user_id, bot.user_id, ...results.map((r) => r.user_id)]);
   const names = new Map([...people].map(([id, p]) => [id, p.name]));
   // Turns from before sharing have no user_id; they were the owner's.
   names.set("", names.get(chatRow.user_id) ?? "someone");
@@ -451,7 +460,8 @@ chat.post("/chats/:id/compact", async (c) => {
 
   let upstream;
   try {
-    upstream = await streamChat(c.env, chatRow.model, [...forModel(history, await speakerNames(c.env, chatRow), { model: chatRow.model, bot: await botFor(c.env, chatRow) }), { role: "user", content: SUMMARY_REQUEST }], {
+    const bot = await botFor(c.env, chatRow);
+    upstream = await streamChat(c.env, chatRow.model, [...forModel(history, await speakerNames(c.env, chatRow, bot), { model: chatRow.model, bot }), { role: "user", content: SUMMARY_REQUEST }], {
       maxTokens: LIMITS.summary_tokens,
       effort: "low",
     });
@@ -499,11 +509,13 @@ chat.post("/chats/:id/remember", async (c) => {
   const userId = c.get("userId");
   const access = await chatAccess(c.env, chatId, userId);
   if (!access) return c.json({ error: "not found" }, 404);
-  if (access.role !== "owner") return c.json({ error: "only the person who started a chat can remember it" }, 403);
   const chatRow = access.chat;
-  if ((await speakerNames(c.env, chatRow)) !== null) return c.json({ error: "a shared chat can't go into your memory" }, 403);
+  const bot = await botFor(c.env, chatRow);
+  // Mine through and through: I started it, and it's with my own bot.
+  if (chatRow.user_id !== userId || bot.user_id !== userId) return c.json({ error: "only a chat you started with your own bot can go into your memory" }, 403);
+  if ((await speakerNames(c.env, chatRow, bot)) !== null) return c.json({ error: "a shared chat can't go into your memory" }, 403);
 
-  const [account, recent, memory, bot] = await Promise.all([accountState(c.env, userId), recentActivity(c.env, userId, userId), loadMemory(c.env, userId), botFor(c.env, chatRow)]);
+  const [account, recent, memory] = await Promise.all([accountState(c.env, userId), recentActivity(c.env, userId, userId), loadMemory(c.env, userId)]);
   if (account.suspended) return c.json({ error: "this account is suspended", code: "suspended" }, 403);
   if (recent.inFlight > 0) return c.json({ error: "a reply is still being written. Wait for it to finish, then try again." }, 429);
   if (creditsEnforced(c.env) && account.balance <= 0) return c.json({ error: "you're out of lettuce", code: "out_of_credits" }, 402);
