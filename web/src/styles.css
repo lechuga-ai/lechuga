@@ -4090,6 +4090,98 @@ button {
   width: min(460px, 100%);
 }
 
+/* Sharing as a setting: three levels, the chosen one open underneath. */
+.sharing-levels {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sharing-level {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.sharing-level.on {
+  border-color: rgba(111, 174, 59, 0.7);
+  background: #f6f9f1;
+}
+
+.sharing-level.off {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.sharing-level input {
+  width: auto;
+  margin-top: 3px;
+}
+
+.sharing-level > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sharing-why {
+  font-size: 12.5px;
+  color: var(--box-dim);
+}
+
+.sharing-people {
+  margin: 2px 0 6px 12px;
+  padding: 10px 12px 10px 14px;
+  border-left: 2px solid rgba(111, 174, 59, 0.5);
+}
+
+.sharing-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sharing-add input {
+  flex: 1;
+  min-width: 180px;
+  padding: 8px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  background: #fbfcfa;
+  font: inherit;
+  font-size: 14px;
+}
+
+.sharing-add input:focus {
+  outline: none;
+  border-color: rgba(111, 174, 59, 0.7);
+  background: #fff;
+}
+
+.sharing-sub {
+  margin-top: 10px;
+}
+
+.modal .sharing-sub p,
+.doc-inner .settings-panel .sharing-sub p,
+.modal p.sharing-offer,
+.doc-inner .settings-panel p.sharing-offer {
+  margin: 8px 0 8px;
+  font-size: 13px;
+}
+
+.sharing .share-people {
+  margin-top: 10px;
+  max-height: none;
+}
+
 .share-terms {
   list-style: none;
   margin: 0 0 16px;

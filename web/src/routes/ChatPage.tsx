@@ -4,8 +4,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MessageList } from "../components/MessageList";
 import { Composer } from "../components/Composer";
 import { AvatarStack } from "../components/Avatar";
-import { ShareDialog } from "../components/ShareDialog";
-import { ApiError, compactChat, getChat, makeChatPublic, rememberChat, sendMessage, type Me, type Message, type Model, type Person, type Roster, type Step } from "../api";
+import { SharingDialog } from "../components/Sharing";
+import { ApiError, addChatMember, cancelPendingShare, compactChat, getChat, makeChatPublic, rememberChat, removeChatMember, sendMessage, type Me, type Message, type Model, type Person, type Roster, type Step } from "../api";
 import { takeStartMessage } from "../startMessage";
 import { appLink, copyText } from "../copy";
 import { composeMessage, estimateMessageTokens, type Attachment } from "../../../worker/src/attachments";
@@ -307,22 +307,30 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
     <div className="chat-view">
       {sharing &&
         createPortal(
-          <ShareDialog
-            chatId={chatId}
-            roster={roster ?? { owner: mePerson, members: [], pending: [] }}
-            onRoster={(r) => {
-              setRoster(r);
-              void refreshChats();
-            }}
-            // Public is for a chat with your own bot, and not a guarded one;
-            // the worker checks too. botOwner set means the bot is someone
-            // else's.
-            canPublic={!botOwner && !me.seat}
-            onPublic={async () => {
-              await makeChatPublic(chatId);
-              setIsPublic(true);
-              setSharing(false);
-              void refreshChats();
+          <SharingDialog
+            target={{
+              kind: "chat",
+              id: chatId,
+              name: "this chat",
+              roster: roster ?? { owner: mePerson, members: [], pending: [] },
+              isPublic,
+              // Public is for a chat with your own bot, and not a guarded one;
+              // the worker checks too. botOwner set means the bot is someone
+              // else's.
+              canPublic: !botOwner && !me.seat,
+              publicReason: botOwner ? "A chat with someone else's bot can't be made public." : undefined,
+              add: (who, useInvite) => addChatMember(chatId, who, useInvite),
+              remove: (userId) => removeChatMember(chatId, userId),
+              cancelPending: (id) => cancelPendingShare(chatId, id),
+              makePublic: () => makeChatPublic(chatId),
+              onRoster: (r) => {
+                setRoster(r as Roster);
+                void refreshChats();
+              },
+              onPublic: () => {
+                setIsPublic(true);
+                void refreshChats();
+              },
             }}
             onClose={() => setSharing(false)}
           />,

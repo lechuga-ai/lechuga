@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
 import {
-  ApiError,
   addBotMember,
   cancelBotPendingShare,
   createSeat,
@@ -18,9 +17,8 @@ import {
   type Me,
   type Model,
 } from "../api";
-import { SEAT_DOMAIN } from "../../../worker/src/seat-email";
-import { copyText, seatLink } from "../copy";
 import { makeBotPublic } from "../api";
+import { SharingPanel, type SharingTarget } from "./Sharing";
 import { Avatar } from "./Avatar";
 import type { Person } from "../api";
 import config from "../../../worker/config.json";
@@ -216,11 +214,8 @@ function BotPanel({ bot, models, highlighted, onSaved, onDeleted, onPeople }: Pa
   );
 }
 
-// Who else has the bot. The owner adds people by username or email and
-// takes them out again; what sharing a bot means is spelled out, since it's
-// their credits and they'll be reading.
-// onClose: the panel is a dialog, so the share screen ends in a Done.
-// onPublic: the bot was made public.
+// A bot's sharing: the shared panel (Sharing.tsx) over the bot's roster,
+// which is fetched here. onClose makes it a dialog (a title and a Done).
 export function BotShare({
   bot,
   onPeople,
@@ -233,30 +228,7 @@ export function BotShare({
   onClose?: () => void;
 }) {
   const [roster, setRoster] = useState<BotRoster | null>(null);
-  const [who, setWho] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
-  const [needsInvite, setNeedsInvite] = useState<{ email: string; remaining: number } | null>(null);
-  // Three screens, one at a time: the share panel; the box for someone
-  // without an email; and the username and code to hand over, shown once.
-  const [mode, setMode] = useState<"share" | "seat" | "code" | "upgrade">("share");
-  const [seatUser, setSeatUser] = useState("");
-  const [handOver, setHandOver] = useState<{ username: string; code: string } | null>(null);
-  // The seat being made a full account, and the email it's given.
-  const [upgrading, setUpgrading] = useState<{ id: string; name: string } | null>(null);
-  const [upgradeEmail, setUpgradeEmail] = useState("");
-
-  async function upgrade(e: FormEvent) {
-    e.preventDefault();
-    if (!upgrading || !upgradeEmail.trim() || busy) return;
-    const who = upgrading;
-    if (await run(() => upgradeSeat(bot.id, who.id, upgradeEmail.trim()), `${who.name} is a full account now. We've emailed ${upgradeEmail.trim()} to say so.`)) {
-      setUpgrading(null);
-      setUpgradeEmail("");
-      setMode("share");
-    }
-  }
 
   useEffect(() => {
     getBot(bot.id)
@@ -264,389 +236,55 @@ export function BotShare({
       .catch(() => setError("couldn't load who has this bot"));
   }, [bot.id]);
 
-  async function goPublic() {
-    if (busy) return;
-    if (
-      !window.confirm(
-        `Make ${bot.name} public? Anyone on Lechuga will be able to find it and chat with it, and every chat with it, the ones you've had so far included, becomes public: anyone can read them. From now on its replies come out of Lechuga's credits. This can't be undone, though you can still delete the bot.`
-      )
-    )
-      return;
-    setBusy(true);
-    setError(null);
-    try {
-      const next = await makeBotPublic(bot.id);
-      setDone(`${bot.name} is public now.`);
-      onPublic?.({ ...bot, ...next });
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function addSeat(e: FormEvent) {
-    e.preventDefault();
-    const username = seatUser.trim().replace(/^@/, "");
-    if (!username || busy) return;
-    setBusy(true);
-    setError(null);
-    setDone(null);
-    try {
-      const made = await createSeat(bot.id, { username });
-      took(made.roster);
-      setHandOver({ username: made.seat.username, code: made.code });
-      setSeatUser("");
-      setMode("code");
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function newCode(userId: string) {
-    if (!window.confirm("Hand out a new code? The old one stops working, and any device signed in with it is signed out.")) return;
-    setBusy(true);
-    setError(null);
-    try {
-      setHandOver(await resetSeatCode(bot.id, userId));
-      setMode("code");
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   function took(r: BotRoster) {
     setRoster(r);
     const active = r.members.filter((m) => !m.removed);
     onPeople(active.length > 0 ? [r.owner, ...active] : undefined);
   }
 
-  async function run(action: () => Promise<{ roster?: BotRoster; waitingFor?: string }>, success?: string) {
-    setBusy(true);
-    setError(null);
-    setDone(null);
-    try {
-      const result = await action();
-      if (result.roster) took(result.roster);
-      setNeedsInvite(null);
-      setDone(result.waitingFor ? `Invite sent. The bot will be waiting for ${result.waitingFor} when they sign in.` : (success ?? null));
-      return true;
-    } catch (err) {
-      if (err instanceof ApiError && err.code === "needs_invite") {
-        setNeedsInvite({ email: who.trim(), remaining: Number(err.body?.invitesRemaining ?? 0) });
-      } else {
-        setError((err as Error).message);
-      }
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function add(e: FormEvent) {
-    e.preventDefault();
-    const entered = who.trim();
-    if (!entered || busy) return;
-    if (await run(() => addBotMember(bot.id, entered), `Shared with ${entered}.`)) setWho("");
-  }
-
-  const active = roster?.members.filter((m) => !m.removed) ?? [];
-  const removed = roster?.members.filter((m) => m.removed) ?? [];
-
-  if (mode === "code" && handOver) {
-    return (
-      <div className="bot-share">
-        <h3 className="bot-share-title">Share {bot.name}</h3>
-        <div className="bot-seat-code">
-          <p>Hand these over. The code is shown this once; if it's lost, hand out a new one from the bot's sharing.</p>
-          <p className="bot-seat-pair">
-            <span>
-              username <b>{handOver.username}</b>
-            </span>
-            <span>
-              code <b>{handOver.code}</b>
-            </span>
-          </p>
-          <p className="settings-count">
-            They sign in at the usual place with "I have a username and a code". (It's stored as {handOver.username}@{SEAT_DOMAIN}, an address that gets
-            no mail.)
-          </p>
-          <p className="bot-seat-link">
-            Or send them this link. It opens the sign-in with the username filled in and lands on {bot.name}:
-            <br />
-            <code>{seatLink(`/b/${bot.id}`, handOver.username)}</code>{" "}
-            <button type="button" className="signin-link" onClick={() => void copyText(seatLink(`/b/${bot.id}`, handOver.username))}>
-              copy
-            </button>
-          </p>
-        </div>
-        <div className="modal-actions">
-          <button
-            type="button"
-            className="primary"
-            onClick={() => {
-              setHandOver(null);
-              setMode("share");
-            }}
-          >
-            Got it
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (mode === "upgrade" && upgrading) {
-    return (
-      <div className="bot-share">
-        <h3 className="bot-share-title">Share {bot.name}</h3>
-        <form onSubmit={upgrade} className="bot-seat-form">
-          <p>
-            Make {upgrading.name} a full account. Give it their email address: from then on they can sign in with it (the username and code keep
-            working too), they get their own credits and invites, they stay in {bot.name} like anyone you've shared it with, and the account stops
-            being yours to answer for. We'll email them to say so.
-          </p>
-          <div className="bot-seat-fields">
-            <input
-              autoFocus
-              type="email"
-              placeholder="their email address"
-              autoCapitalize="none"
-              spellCheck={false}
-              value={upgradeEmail}
-              onChange={(e) => setUpgradeEmail(e.target.value)}
-              disabled={busy}
-            />
-          </div>
-          {error && <p className="modal-error">{error}</p>}
-          <div className="modal-actions">
-            <button
-              type="button"
-              onClick={() => {
-                setUpgrading(null);
-                setMode("share");
-              }}
-              disabled={busy}
-            >
-              Back
-            </button>
-            <button type="submit" className="primary" disabled={busy || !upgradeEmail.trim()}>
-              {busy ? "making…" : "Make it a full account"}
-            </button>
-          </div>
-        </form>
-      </div>
-    );
-  }
-
-  if (mode === "seat") {
-    return (
-      <div className="bot-share">
-        <h3 className="bot-share-title">Share {bot.name}</h3>
-        <form onSubmit={addSeat} className="bot-seat-form">
-          <p>
-            For someone without an email address: an account of its own, for this bot only. Pick a username; Lechuga gives you a code to hand over,
-            and they sign in with those. What they say to {bot.name} is yours to read, like any chat with a bot you share. It can't buy credits, make
-            bots or be shared with. You can hand out a new code at any time, or remove it, which deletes it. Up to five at a time.
-          </p>
-          <div className="bot-seat-fields">
-            <input
-              autoFocus
-              placeholder="username"
-              autoCapitalize="none"
-              spellCheck={false}
-              maxLength={20}
-              value={seatUser}
-              onChange={(e) => setSeatUser(e.target.value)}
-              disabled={busy}
-            />
-          </div>
-          {error && <p className="modal-error">{error}</p>}
-          <div className="modal-actions">
-            <button type="button" onClick={() => setMode("share")} disabled={busy}>
-              Back
-            </button>
-            <button type="submit" className="primary" disabled={busy || !seatUser.trim()}>
-              {busy ? "making…" : "Make the account"}
-            </button>
-          </div>
-        </form>
-      </div>
-    );
-  }
+  const target: SharingTarget | null = roster && {
+    kind: "bot",
+    id: bot.id,
+    name: bot.name,
+    roster,
+    isPublic: bot.visibility === "public",
+    canPublic: bot.guarded !== 1 && roster.members.filter((m) => !m.removed).length + roster.pending.length === 0,
+    publicReason:
+      bot.guarded === 1
+        ? "A guarded bot can't be public."
+        : roster.members.filter((m) => !m.removed).length + roster.pending.length > 0
+          ? "Not while it's shared with people: that would publish their chats. Remove them first."
+          : undefined,
+    add: (who, useInvite) => addBotMember(bot.id, who, useInvite),
+    remove: (userId) => removeBotMember(bot.id, userId),
+    cancelPending: (id) => cancelBotPendingShare(bot.id, id),
+    makePublic: async () => {
+      const next = await makeBotPublic(bot.id);
+      onPublic?.({ ...bot, ...next });
+    },
+    seats: {
+      create: (username) => createSeat(bot.id, { username }),
+      newCode: (userId) => resetSeatCode(bot.id, userId),
+      remove: (userId) => deleteSeat(bot.id, userId),
+      upgrade: (userId, email) => upgradeSeat(bot.id, userId, email),
+    },
+    onRoster: (r) => took(r as BotRoster),
+    onPublic: () => {},
+  };
 
   return (
-    <div className="bot-share">
-      <h3 className="bot-share-title">Share {bot.name}</h3>
-      <ul className="share-terms">
-        <li>
-          <strong>They get their own chats with it.</strong> It shows up in their list, and they talk to it like you do.
-        </li>
-        <li>
-          <strong>You see every chat they have with it.</strong> They're told that on the bot, and in each chat.
-        </li>
-        <li>
-          <strong>You pay for it.</strong> Every reply in those chats comes out of your credits.
-        </li>
-      </ul>
-      {needsInvite ? (
-        <div className="share-invite">
-          <p>
-            <strong>{needsInvite.email}</strong> isn't on Lechuga yet.{" "}
-            {needsInvite.remaining > 0
-              ? `Use one of your ${needsInvite.remaining} ${needsInvite.remaining === 1 ? "invite" : "invites"} to bring them in? The bot will be waiting when they sign in.`
-              : "You'd need an invite to bring them in, and you have none left."}
-          </p>
-          <div className="modal-actions">
-            <button type="button" onClick={() => setNeedsInvite(null)} disabled={busy}>
-              Never mind
-            </button>
-            {needsInvite.remaining > 0 && (
-              <button type="button" className="primary" onClick={() => void run(() => addBotMember(bot.id, needsInvite.email, true)).then((ok) => ok && setWho(""))} disabled={busy}>
-                {busy ? "inviting…" : "Use an invite"}
-              </button>
-            )}
-          </div>
-        </div>
-      ) : (
-        <form onSubmit={add} className="modal-form">
-          <input autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="@username or email" value={who} onChange={(e) => setWho(e.target.value)} disabled={busy} />
-          <button type="submit" className="primary" disabled={busy || !who.trim()}>
-            {busy ? "sharing…" : "share"}
-          </button>
-        </form>
-      )}
-      {!needsInvite && (
-        <p className="bot-seat-offer">
-          Someone without an email address?{" "}
-          <button
-            type="button"
-            className="signin-link"
-            onClick={() => {
-              setError(null);
-              setMode("seat");
-            }}
-            disabled={busy}
-          >
-            make them a username and a code
-          </button>
-        </p>
-      )}
-      {done && <p className="modal-ok">{done}</p>}
+    <>
+      {onClose && <h2>Sharing: {bot.name}</h2>}
       {error && <p className="modal-error">{error}</p>}
-      {bot.visibility === "public" ? (
-        <p className="share-public-note">
-          <b>This bot is public.</b> Anyone can find it and chat with it, and every chat with it is public, on Lechuga's credits.
-        </p>
-      ) : (
-        bot.guarded !== 1 &&
-        !needsInvite && (
-          <div className="share-public">
-            <p>
-              <strong>Or make it public.</strong> Anyone on Lechuga can find it and chat with it; every chat with it, yours so far included, becomes
-              readable by everyone; and its replies come out of Lechuga's credits. It can't be made private again. Not while it's shared with anyone.
-            </p>
-            <button type="button" className="signin-link" onClick={goPublic} disabled={busy}>
-              make this bot public
-            </button>
-          </div>
-        )
-      )}
-      {roster && (active.length > 0 || roster.pending.length > 0 || removed.length > 0) && (
-        <ul className="share-people">
-          {active.map((p) => (
-            <li key={p.id}>
-              <Avatar person={p} size={28} />
-              <span className="share-name">
-                {p.name}
-                {p.username && p.name !== `@${p.username}` && <span className="share-handle"> @{p.username}</span>}
-                {p.seat && <span className="share-state"> · username and code</span>}
-              </span>
-              {p.seat && (
-                <>
-                  {p.username && (
-                    <button
-                      type="button"
-                      className="signin-link"
-                      disabled={busy}
-                      title="Copy a link that opens the sign-in with their username filled in and lands on this bot"
-                      onClick={() => void copyText(seatLink(`/b/${bot.id}`, p.username!))}
-                    >
-                      link
-                    </button>
-                  )}
-                  <button type="button" className="signin-link" disabled={busy} onClick={() => void newCode(p.id)}>
-                    new code
-                  </button>
-                  <button
-                    type="button"
-                    className="signin-link"
-                    disabled={busy}
-                    onClick={() => {
-                      setError(null);
-                      setUpgrading({ id: p.id, name: p.name });
-                      setMode("upgrade");
-                    }}
-                  >
-                    full account
-                  </button>
-                </>
-              )}
-              <button
-                type="button"
-                className="signin-link"
-                disabled={busy}
-                onClick={() => {
-                  if (p.seat) {
-                    if (
-                      window.confirm(
-                        `Remove ${p.name}? This deletes the account for good: they're signed out and can't sign in again, and the username ${p.name} is released for anyone to take. Their chats with ${bot.name} stay with you, under "someone who left". There's no undo.`
-                      )
-                    ) {
-                      void run(() => deleteSeat(bot.id, p.id), `${p.name} is gone.`);
-                    }
-                  } else {
-                    void run(() => removeBotMember(bot.id, p.id), `${p.name} no longer has this bot. Their chats with it stay with you.`);
-                  }
-                }}
-              >
-                remove
-              </button>
-            </li>
-          ))}
-          {roster.pending.map((p) => (
-            <li key={p.id}>
-              <span className="avatar more" style={{ width: 28, height: 28, fontSize: 13 }}>
-                ?
-              </span>
-              <span className="share-name">{p.email}</span>
-              <span className="share-state">hasn't joined yet</span>
-              <button type="button" className="signin-link" disabled={busy} onClick={() => void run(() => cancelBotPendingShare(bot.id, p.id))}>
-                cancel
-              </button>
-            </li>
-          ))}
-          {removed.map((p) => (
-            <li key={p.id} className="removed">
-              <Avatar person={p} size={28} />
-              <span className="share-name">{p.name}</span>
-              <span className="share-state">removed</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {target ? <SharingPanel target={target} /> : !error && <p className="settings-count">loading…</p>}
       {onClose && (
         <div className="modal-actions">
-          <button type="button" onClick={onClose} disabled={busy}>
+          <button type="button" onClick={onClose}>
             Done
           </button>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
