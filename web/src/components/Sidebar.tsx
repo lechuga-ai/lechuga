@@ -173,16 +173,17 @@ export function Sidebar({
   function chatRow(chat: Chat & { snippet?: string | null }) {
     return (
       <div key={chat.id} className={`chat-list-item ${chat.id === activeChatId ? "active" : ""}`} onClick={() => onSelect(chat.id)}>
-        {/* Public: anyone can read it, like the faces say it's shared. */}
-        {chat.visibility === "public" && (
+        <span className="chat-title">{chat.title ?? "New chat"}</span>
+        {chat.snippet && <span className="chat-snippet">{chat.snippet}</span>}
+        {/* Who it's open to, where the faces go: everyone (◎), or the people
+            in it, the owner ringed. */}
+        {chat.visibility === "public" ? (
           <span className="public-mark" title="Public: anyone on Lechuga can read this chat">
             ◎
           </span>
+        ) : (
+          chat.people && <AvatarStack people={chat.people} ownerId={chat.user_id} size={16} max={3} />
         )}
-        <span className="chat-title">{chat.title ?? "New chat"}</span>
-        {chat.snippet && <span className="chat-snippet">{chat.snippet}</span>}
-        {/* Shared: everyone in it, the owner ringed. */}
-        {chat.people && <AvatarStack people={chat.people} ownerId={chat.user_id} size={16} max={3} />}
         <span className="chat-age">{ageLabel(chat.updated_at, now)}</span>
         {/* The chat's dots: Share…, Copy link, and Delete or Leave. */}
         <button
@@ -282,14 +283,16 @@ export function Sidebar({
           groups.map(({ bot, chats: own }) => (
             <div key={bot.id} className="bot-group" style={{ borderLeftColor: colourFor(bot.id) }}>
               <div className="bot-row">
-                {bot.visibility === "public" && (
+                <span className="bot-row-name">{bot.name}</span>
+                {/* Who it's open to, where the faces go: everyone (◎), or the
+                    people with it, the owner ringed. */}
+                {bot.visibility === "public" ? (
                   <span className="public-mark" title="Public: anyone on Lechuga can chat with this bot, and every chat with it is public">
                     ◎
                   </span>
+                ) : (
+                  bot.people && <AvatarStack people={bot.people} ownerId={bot.user_id} size={16} max={3} />
                 )}
-                <span className="bot-row-name">{bot.name}</span>
-                {/* Once shared: everyone with it, the owner ringed. */}
-                {bot.people && <AvatarStack people={bot.people} ownerId={bot.user_id} size={16} max={3} />}
                 <button
                   type="button"
                   className="bot-row-dots"
