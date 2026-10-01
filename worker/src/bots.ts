@@ -315,6 +315,9 @@ bots.post("/:id/members", async (c) => {
   }
 
   if (target.id === userId) return c.json({ error: "that's you" }, 400);
+  // A seat (seats.ts) goes where the account that made it puts it, nowhere else.
+  const seat = await c.env.DB.prepare("SELECT seat_of FROM user WHERE id = ?").bind(target.id).first<{ seat_of: string | null }>();
+  if (seat?.seat_of && seat.seat_of !== userId) return c.json({ error: `nobody here goes by @${who}` }, 404);
   const existing = await c.env.DB.prepare("SELECT removed_at FROM bot_members WHERE bot_id = ? AND user_id = ?")
     .bind(bot.id, target.id)
     .first<{ removed_at: number | null }>();

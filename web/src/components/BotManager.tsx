@@ -457,15 +457,19 @@ export function BotShare({ bot, onPeople }: { bot: Bot; onPeople: (people: Perso
                 disabled={busy}
                 onClick={() => {
                   if (p.seat) {
-                    if (window.confirm(`Delete ${p.name}'s account? They won't be able to sign in. Their chats with ${bot.name} stay with you.`)) {
-                      void run(() => deleteSeat(bot.id, p.id), `${p.name}'s account is gone.`);
+                    if (
+                      window.confirm(
+                        `Remove ${p.name}? This account exists only for ${bot.name}, so removing it deletes it for good: they can't sign in again, and the username is freed. Their chats with ${bot.name} stay with you.`
+                      )
+                    ) {
+                      void run(() => deleteSeat(bot.id, p.id), `${p.name} is gone.`);
                     }
                   } else {
                     void run(() => removeBotMember(bot.id, p.id), `${p.name} no longer has this bot. Their chats with it stay with you.`);
                   }
                 }}
               >
-                {p.seat ? "delete" : "remove"}
+                remove
               </button>
             </li>
           ))}

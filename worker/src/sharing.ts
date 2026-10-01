@@ -194,6 +194,9 @@ sharing.post("/chats/:id/members", async (c) => {
   }
 
   if (target.id === userId) return c.json({ error: "that's you" }, 400);
+  // A seat (seats.ts) goes where the account that made it puts it, nowhere else.
+  const seat = await c.env.DB.prepare("SELECT seat_of FROM user WHERE id = ?").bind(target.id).first<{ seat_of: string | null }>();
+  if (seat?.seat_of && seat.seat_of !== userId) return c.json({ error: `nobody here goes by @${who}` }, 404);
   const existing = await c.env.DB.prepare("SELECT removed_at FROM chat_members WHERE chat_id = ? AND user_id = ?")
     .bind(chat.id, target.id)
     .first<{ removed_at: number | null }>();
