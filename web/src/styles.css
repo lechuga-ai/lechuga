@@ -98,7 +98,7 @@ button {
 /* Sidebar: a drawer by default, docked in chat mode on wide screens */
 
 .sidebar {
-  width: 260px;
+  width: 320px;
   flex-shrink: 0;
   background: var(--sidebar);
   color: #1e221b;
@@ -142,7 +142,7 @@ button {
 
 /* Rides out with the drawer so it never sits on top of the logo. */
 .sidebar-drawer-toggle.open {
-  left: 274px;
+  left: 334px;
 }
 
 @media (min-width: 769px) {

@@ -377,7 +377,7 @@ export function Sidebar({
 
       {/* Dialogs go to document.body: the sidebar is transformed for its
           drawer animation, which would otherwise trap position: fixed
-          inside its 260px box. */}
+          inside its 320px box. */}
       {dialog === "invite" &&
         createPortal(<InviteDialog onClose={() => setDialog("none")} onRemainingChange={setRemaining} />, document.body)}
       {shareBot &&
