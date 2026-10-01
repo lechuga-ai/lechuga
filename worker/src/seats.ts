@@ -66,7 +66,7 @@ seats.post("/:id/seats", async (c) => {
   if (!code) return c.json({ error: `a code is ${CODE_MIN} to ${CODE_MAX} characters` }, 400);
 
   if ((await seatsOf(c.env, userId)) >= config.limits.seats_per_account) {
-    return c.json({ error: `that's ${config.limits.seats_per_account} already, which is the most one account can make` }, 400);
+    return c.json({ error: `that's ${config.limits.seats_per_account} already, the most one account can have at a time; remove one to make another` }, 400);
   }
   const taken = await c.env.DB.prepare("SELECT 1 AS one FROM user WHERE lower(username) = ?").bind(normalizeUsername(check.username)).first();
   if (taken) return c.json({ error: "that one's taken" }, 409);
@@ -113,22 +113,17 @@ seats.post("/:id/seats/:userId/code", async (c) => {
   return c.json({ username: seat.username, code });
 });
 
-// Removed, not deleted: signed out everywhere, its code wiped, out of the
-// bot, but the account stays, dormant, so the username stays its own and
-// its chats keep their name. The owner brings it back by adding the
-// username to a bot again (bots.ts) and handing out a new code.
+// Gone for good: the account, its sessions, its place in the bot, and the
+// username with it, free for anyone. Its chats stay with the owner, who
+// could always see them, under "someone who left". This is what keeps the
+// count of seats an account can have (seats_per_account) a count of live
+// ones.
 seats.delete("/:id/seats/:userId", async (c) => {
   const userId = c.get("userId");
   const access = await botAccess(c.env, c.req.param("id"), userId);
   if (!access || access.role !== "owner") return c.json({ error: "not found" }, 404);
   const seatId = c.req.param("userId");
-  const seat = await c.env.DB.prepare("SELECT 1 AS one FROM user WHERE id = ? AND seat_of = ?").bind(seatId, userId).first();
-  if (!seat) return c.json({ error: "not found" }, 404);
-  const nowIso = new Date().toISOString();
-  await c.env.DB.batch([
-    c.env.DB.prepare("UPDATE bot_members SET removed_at = ? WHERE bot_id = ? AND user_id = ? AND removed_at IS NULL").bind(Date.now(), access.bot.id, seatId),
-    c.env.DB.prepare("UPDATE account SET password = NULL, updatedAt = ? WHERE userId = ? AND providerId = 'credential'").bind(nowIso, seatId),
-    c.env.DB.prepare("DELETE FROM session WHERE userId = ?").bind(seatId),
-  ]);
+  const gone = await c.env.DB.prepare("DELETE FROM user WHERE id = ? AND seat_of = ?").bind(seatId, userId).run();
+  if (!gone.meta.changes) return c.json({ error: "not found" }, 404);
   return c.json({ roster: await botRoster(c.env, access.bot, true) });
 });

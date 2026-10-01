@@ -350,7 +350,7 @@ export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (peop
           <p>
             For someone without an email address: an account of its own, for this bot only. Pick a username; Lechuga gives you a code to hand over,
             and they sign in with those. What they say to {bot.name} is yours to read, like any chat with a bot you share. It can't buy credits, make
-            bots or be shared with. You can hand out a new code or delete it at any time.
+            bots or be shared with. You can hand out a new code at any time, or remove it, which deletes it. Up to five at a time.
           </p>
           <div className="bot-seat-fields">
             <input
@@ -460,10 +460,10 @@ export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (peop
                   if (p.seat) {
                     if (
                       window.confirm(
-                        `Remove ${p.name}? They're signed out and can't sign in again. Their chats with ${bot.name} stay with you, and the username stays theirs: you can bring them back from this list, with a new code.`
+                        `Remove ${p.name}? This deletes the account for good: they're signed out and can't sign in again, and the username ${p.name} is released for anyone to take. Their chats with ${bot.name} stay with you, under "someone who left". There's no undo.`
                       )
                     ) {
-                      void run(() => deleteSeat(bot.id, p.id), `${p.name} is signed out and out of ${bot.name}.`);
+                      void run(() => deleteSeat(bot.id, p.id), `${p.name} is gone.`);
                     }
                   } else {
                     void run(() => removeBotMember(bot.id, p.id), `${p.name} no longer has this bot. Their chats with it stay with you.`);
@@ -491,31 +491,6 @@ export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (peop
               <Avatar person={p} size={28} />
               <span className="share-name">{p.name}</span>
               <span className="share-state">removed</span>
-              {/* A seat comes back with a new code; it has no email to be
-                  told by, so the code screen follows at once. */}
-              {p.seat && p.username && (
-                <button
-                  type="button"
-                  className="signin-link"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(() => addBotMember(bot.id, p.username!)).then(async (ok) => {
-                      if (!ok) return;
-                      setBusy(true);
-                      try {
-                        setHandOver(await resetSeatCode(bot.id, p.id));
-                        setMode("code");
-                      } catch (err) {
-                        setError((err as Error).message);
-                      } finally {
-                        setBusy(false);
-                      }
-                    })
-                  }
-                >
-                  bring back
-                </button>
-              )}
             </li>
           ))}
         </ul>
