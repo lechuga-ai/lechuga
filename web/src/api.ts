@@ -193,8 +193,9 @@ export async function cancelBotPendingShare(botId: string, pendingId: string): P
   return expectJson(await apiFetch(`/api/bots/${botId}/pending/${pendingId}`, { method: "DELETE" }));
 }
 
-// Takes a few seconds: the worker has the model draft a soul from the name.
-export async function createBot(name: string): Promise<Bot> {
+// Comes back at once with an empty soul; the worker drafts one from the name
+// in the background, so ask again (getBot) until it's there.
+export async function createBot(name: string): Promise<Bot & { drafting: boolean }> {
   return expectJson(await postJson("/api/bots", { name }));
 }
 

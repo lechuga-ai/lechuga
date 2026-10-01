@@ -109,62 +109,88 @@ function BotPanel({ bot, models, highlighted, onSaved, onDeleted, onPeople }: Pa
     }
   }
 
+  const sharedWith = (bot.people?.length ?? 1) - 1;
+  const modelLabel = models.find((m) => m.id === bot.model)?.label;
+  const status = [
+    bot.is_default === 1 ? "the one every account starts with" : null,
+    modelLabel ? `on ${modelLabel}` : null,
+    bot.guarded === 1 ? "guarded" : null,
+    sharedWith > 0 ? `shared with ${sharedWith} ${sharedWith === 1 ? "person" : "people"}` : null,
+  ].filter(Boolean);
+
   return (
     <section id={bot.id} className={`settings-panel bot-panel ${highlighted ? "highlighted" : ""}`}>
-      <h2 className="bot-panel-title">
-        <Avatar person={{ id: bot.id, name: bot.name, username: null, photo: null }} size={26} />
-        {bot.name}
-        {bot.is_default === 1 && <span className="bot-panel-note">the one every account starts with</span>}
-      </h2>
-      <form className="settings-form" onSubmit={submit}>
-        <label htmlFor={`bot-name-${bot.id}`}>Name</label>
-        <input id={`bot-name-${bot.id}`} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} disabled={busy} />
-        <label htmlFor={`bot-model-${bot.id}`}>Model for new chats</label>
-        <select id={`bot-model-${bot.id}`} className="settings-select" value={model} onChange={(e) => setModel(e.target.value)} disabled={busy}>
-          <option value="">The default ({current[0]?.label ?? "…"})</option>
-          {current.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.label}
-            </option>
-          ))}
-        </select>
-        <p className="settings-count">A chat keeps the model it was started on; you can still pick another for any one chat.</p>
+      <header className="bot-panel-head">
+        <Avatar person={{ id: bot.id, name: bot.name, username: null, photo: null }} size={40} />
+        <div>
+          <h2 className="bot-panel-title">{bot.name}</h2>
+          {status.length > 0 && <p className="bot-panel-status">{status.join(" · ")}</p>}
+        </div>
+      </header>
+      <form className="settings-form bot-form" onSubmit={submit}>
+        <div className="bot-form-row">
+          <div>
+            <label htmlFor={`bot-name-${bot.id}`}>Name</label>
+            <input id={`bot-name-${bot.id}`} maxLength={40} value={name} onChange={(e) => setName(e.target.value)} disabled={busy} />
+          </div>
+          <div>
+            <label htmlFor={`bot-model-${bot.id}`}>Model for new chats</label>
+            <select id={`bot-model-${bot.id}`} className="settings-select" value={model} onChange={(e) => setModel(e.target.value)} disabled={busy}>
+              <option value="">The default ({current[0]?.label ?? "…"})</option>
+              {current.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
         <label htmlFor={`bot-soul-${bot.id}`}>How it behaves</label>
         <textarea
           id={`bot-soul-${bot.id}`}
           value={soul}
           maxLength={SOUL_MAX}
-          rows={8}
+          rows={7}
           placeholder="What it's for, what it focuses on, how it talks. For example: You help plan meals for a family of four on a budget. Short, practical answers; ask about allergies once."
           onChange={(e) => setSoul(e.target.value)}
           disabled={busy}
         />
         <p className="settings-count">
-          {soul.length.toLocaleString()} of {SOUL_MAX.toLocaleString()} characters.
+          Sent with every message to it. {soul.length.toLocaleString()} of {SOUL_MAX.toLocaleString()} characters.
         </p>
-        <label className="settings-check bot-guard-check">
-          <input type="checkbox" checked={guarded} onChange={(e) => setGuarded(e.target.checked)} disabled={busy} />
-          <span>
-            <b>Guarded.</b> Keeps everything it says suitable for a young person, whatever it's asked and however it's asked. Every message is checked
-            first: if someone brings up hurting themselves or others, or weapons, it stops, tells them to talk to a trusted adult, and emails you.
-            Explicit requests are refused. Web search is off, and it always thinks before answering. Works alongside how it behaves above; this has the
-            last word.
-          </span>
-        </label>
+        <div className="bot-guard">
+          <label className="settings-check">
+            <input type="checkbox" checked={guarded} onChange={(e) => setGuarded(e.target.checked)} disabled={busy} />
+            <span>
+              <b>Guarded.</b> Suitable for a young person, whatever it's asked.
+            </span>
+          </label>
+          <details className="bot-details">
+            <summary>What guarded does</summary>
+            <p>
+              Every message is checked before the bot sees it. If someone brings up hurting themselves or others, or weapons, the bot stops, tells them
+              to talk to a trusted adult, and emails you. Explicit requests are refused. Web search and page reading are off, and it always thinks
+              before answering. It works alongside how it behaves above, and has the last word.
+            </p>
+          </details>
+        </div>
         {error && <p className="modal-error">{error}</p>}
-        <div className="modal-actions">
-          {saved && !changed && <span className="settings-saved">Saved.</span>}
+        <div className="modal-actions bot-form-actions">
           <button type="submit" className="primary" disabled={busy || !changed}>
             {busy ? "saving…" : "Save"}
           </button>
+          {saved && !changed && <span className="settings-saved">Saved.</span>}
           {bot.is_default !== 1 && (
-            <button type="button" className="signin-link" onClick={remove} disabled={busy}>
+            <button type="button" className="signin-link bot-delete" onClick={remove} disabled={busy}>
               delete this bot
             </button>
           )}
         </div>
       </form>
-      <BotShare bot={bot} onPeople={onPeople} />
+      <details className="bot-details bot-sharing">
+        <summary>Sharing{sharedWith > 0 ? ` · ${sharedWith} ${sharedWith === 1 ? "person" : "people"}` : ""}</summary>
+        <BotShare bot={bot} onPeople={onPeople} />
+      </details>
     </section>
   );
 }
@@ -226,7 +252,7 @@ export function BotShare({ bot, onPeople }: { bot: Bot; onPeople: (people: Perso
 
   return (
     <div className="bot-share">
-      <h3>Share {bot.name}</h3>
+      <h3 className="bot-share-title">Share {bot.name}</h3>
       <ul className="share-terms">
         <li>
           <strong>They get their own chats with it.</strong> It shows up in their list, and they talk to it like you do.
@@ -339,11 +365,16 @@ function SharedBotPanel({ me, bot, highlighted, onLeft }: { me: Me; bot: Bot; hi
   const ownerName = roster?.owner.name ?? "its owner";
   return (
     <section id={bot.id} className={`settings-panel bot-panel ${highlighted ? "highlighted" : ""}`}>
-      <h2 className="bot-panel-title">
-        <Avatar person={{ id: bot.id, name: bot.name, username: null, photo: null }} size={26} />
-        {bot.name}
-        <span className="bot-panel-note">shared with you{roster ? ` by ${ownerName}` : ""}</span>
-      </h2>
+      <header className="bot-panel-head">
+        <Avatar person={{ id: bot.id, name: bot.name, username: null, photo: null }} size={40} />
+        <div>
+          <h2 className="bot-panel-title">{bot.name}</h2>
+          <p className="bot-panel-status">
+            shared with you{roster ? ` by ${ownerName}` : ""}
+            {bot.guarded === 1 ? " · guarded" : ""}
+          </p>
+        </div>
+      </header>
       <p>
         {ownerName} can read every chat you have with {bot.name}, and can join in. The replies come out of their credits, not yours. Nothing you tell
         it is kept about you.

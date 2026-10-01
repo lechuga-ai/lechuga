@@ -107,13 +107,10 @@ export default function App({ me, onSignOut }: Props) {
     navigate(`/b/${id}`);
   }
 
-  // A new bot is simply the one you're now on; its page is in Bot Manager
-  // when wanted, not forced.
+  // A bot just made, and again as its draft and settings arrive: into the
+  // list, or over the copy already there.
   function handleBotCreated(bot: Bot) {
-    setBots((prev) => [...prev, bot]);
-    rememberBot(bot.id);
-    if (bot.model && models.some((m) => m.id === bot.model)) setSelectedModel(bot.model);
-    navigate(`/b/${bot.id}`);
+    setBots((prev) => (prev.some((b) => b.id === bot.id) ? prev.map((b) => (b.id === bot.id ? { ...b, ...bot } : b)) : [...prev, bot]));
   }
 
   function refreshBalance() {
@@ -189,6 +186,7 @@ export default function App({ me, onSignOut }: Props) {
         chats={chats}
         bots={bots}
         onBotCreated={handleBotCreated}
+        onBotStart={(bot) => selectBot(bot.id)}
         onBotPeople={(botId, people) => setBots((prev) => prev.map((b) => (b.id === botId ? { ...b, people } : b)))}
         activeChatId={activeChatId}
         open={drawerOpen}

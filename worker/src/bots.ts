@@ -182,13 +182,22 @@ bots.post("/", async (c) => {
   const model = typeof body?.model === "string" && MODEL_IDS.has(body.model) ? body.model : null;
   const userId = c.get("userId");
   await defaultBot(c.env, userId);
-  const soul = await draftSoul(c.env, name);
   const now = Date.now();
-  const bot: BotView = { id: crypto.randomUUID(), user_id: userId, name, soul, model, is_default: 0, guarded: 0, created_at: now, updated_at: now, role: "owner" };
+  const bot: BotView = { id: crypto.randomUUID(), user_id: userId, name, soul: "", model, is_default: 0, guarded: 0, created_at: now, updated_at: now, role: "owner" };
   await c.env.DB.prepare("INSERT INTO bots (id, user_id, name, soul, model, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)")
-    .bind(bot.id, userId, name, soul, model, now, now)
+    .bind(bot.id, userId, name, "", model, now, now)
     .run();
-  return c.json(bot);
+  // The draft takes the model a few seconds; the bot exists now and the
+  // soul lands when it's written (the page asks again until it has). An
+  // empty draft stays empty: the person writes it, or leaves it.
+  c.executionCtx.waitUntil(
+    draftSoul(c.env, name).then(async (soul) => {
+      if (!soul) return;
+      // Only if nobody has written one meanwhile.
+      await c.env.DB.prepare("UPDATE bots SET soul = ?, updated_at = ? WHERE id = ? AND soul = ''").bind(soul, Date.now(), bot.id).run();
+    })
+  );
+  return c.json({ ...bot, drafting: true });
 });
 
 // One bot, with who's in it. A member sees the soul too (read-only on the
