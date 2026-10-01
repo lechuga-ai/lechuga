@@ -51,7 +51,32 @@ export const HOME_SECTIONS: Section[] = [
       },
       {
         text:
-          "Every chat is with a bot. You start with one, called Seed, and make more by naming them for a job (Sous Chef, Homework Helper): Lechuga works out from the name how each should behave, and you can rewrite that. A chat or a bot can be yours alone, shared with people you choose, or open to everyone on Lechuga. Someone you share a bot with gets their own chats with it, which you can read; that's also how you set one up for someone who has no email address, with a username and a code, and how you make a bot that stays suitable for a young person, with a guard that checks every message.",
+          "Every chat is with a bot. You start with one, called Seed, and make more by naming them for a job (Sous Chef, Homework Helper): Lechuga works out from the name how each should behave, and you can rewrite that, pick a model for it, and share it.",
+      },
+    ],
+  },
+  {
+    id: "sharing",
+    title: "Sharing",
+    paragraphs: [
+      {
+        text:
+          "A chat or a bot has one setting for who can see it, with three choices: only you, people you choose, or everyone on Lechuga. Change it from Share, on the chat or the bot. Nothing changes until you press Done, and anything that takes access away asks first.",
+      },
+      {
+        lead: "A chat you share",
+        text:
+          "is read in full by the people you share it with, from the first message, and they can keep it going; every message shows who typed it. The replies come out of your credits, whoever asked. Remove someone and they lose sight of it; what they wrote stays.",
+      },
+      {
+        lead: "A bot you share",
+        text:
+          "gives each person their own chats with it, which you can read, and they're told so. You pay for those too. It's how a household shares one well-tuned bot, and how you set one up for someone who has no email address: make them a username and a code, and the account can only chat with what you've given it. Turn Guarded on in Bot Manager and the bot keeps everything suitable for a young person, with a check on every message that emails you about the serious kinds.",
+      },
+      {
+        lead: "Everyone on Lechuga",
+        text:
+          "means public: anyone signed in can read it and join in, it's listed under Public in the menu behind your name, and the replies come out of Lechuga's credits rather than yours. Your name is on it. A public bot makes every chat with it public, the ones so far included. Public can be undone from the same place.",
       },
     ],
   },
