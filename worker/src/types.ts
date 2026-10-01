@@ -34,6 +34,8 @@ export type Vars = {
   userName: string;
   username: string | null;
   isAdmin: boolean;
+  // A seat (seats.ts): the account that made it. Null for everyone else.
+  seatOf: string | null;
 };
 
 export type AppEnv = { Bindings: Env; Variables: Vars };

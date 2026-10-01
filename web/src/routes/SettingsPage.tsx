@@ -45,7 +45,10 @@ export function SettingsPage({ me, onMeChange }: Props) {
   }, []);
   const page =
     pathname === "/settings/credits" ? "Credits" : pathname === "/settings/memory" ? "Memory" : pathname === "/settings/bots" ? "Bot Manager" : "Profile";
-  const nav = NAV.map((g) => (g.to === "/settings/bots" ? { ...g, sections: bots.map((b) => ({ id: b.id, label: b.name })) } : g));
+  // A seat has no memory or credits: Profile and the bots it's been given.
+  const nav = NAV.filter((g) => !me.seat || g.to === "/settings" || g.to === "/settings/bots").map((g) =>
+    g.to === "/settings/bots" ? { ...g, sections: bots.map((b) => ({ id: b.id, label: b.name })) } : g
+  );
   return (
     <SideNavPage title={page} nav={nav} navLabel="Account">
       {page === "Credits" ? (

@@ -67,9 +67,9 @@ const GONE = (id: string): Person => ({ id, name: "someone who left", username: 
 
 export async function roster(env: Env, chat: ChatRow, forOwner: boolean): Promise<Roster> {
   const [{ results: rows }, { results: pending }] = await Promise.all([
-    env.DB.prepare("SELECT user_id, removed_at FROM chat_members WHERE chat_id = ? ORDER BY added_at ASC")
+    env.DB.prepare("SELECT m.user_id, m.removed_at, u.seat_of FROM chat_members m LEFT JOIN user u ON u.id = m.user_id WHERE m.chat_id = ? ORDER BY m.added_at ASC")
       .bind(chat.id)
-      .all<{ user_id: string; removed_at: number | null }>(),
+      .all<{ user_id: string; removed_at: number | null; seat_of: string | null }>(),
     forOwner
       ? env.DB.prepare("SELECT id, email FROM chat_pending_shares WHERE chat_id = ? ORDER BY created_at ASC").bind(chat.id).all<{ id: string; email: string }>()
       : Promise.resolve({ results: [] as { id: string; email: string }[] }),
@@ -77,7 +77,9 @@ export async function roster(env: Env, chat: ChatRow, forOwner: boolean): Promis
   const people = await peopleByIds(env, [chat.user_id, ...rows.map((r) => r.user_id)]);
   return {
     owner: people.get(chat.user_id) ?? GONE(chat.user_id),
-    members: rows.map((r) => ({ ...(people.get(r.user_id) ?? GONE(r.user_id)), removed: r.removed_at !== null })),
+    // seat: a username-and-code account (seats.ts), so the dialog can offer
+    // the link that signs it in.
+    members: rows.map((r) => ({ ...(people.get(r.user_id) ?? GONE(r.user_id)), removed: r.removed_at !== null, seat: r.seat_of !== null })),
     pending,
   };
 }
@@ -194,6 +196,9 @@ sharing.post("/chats/:id/members", async (c) => {
   }
 
   if (target.id === userId) return c.json({ error: "that's you" }, 400);
+  // A seat (seats.ts) goes where the account that made it puts it, nowhere else.
+  const seat = await c.env.DB.prepare("SELECT seat_of FROM user WHERE id = ?").bind(target.id).first<{ seat_of: string | null }>();
+  if (seat?.seat_of && seat.seat_of !== userId) return c.json({ error: `nobody here goes by @${who}` }, 404);
   const existing = await c.env.DB.prepare("SELECT removed_at FROM chat_members WHERE chat_id = ? AND user_id = ?")
     .bind(chat.id, target.id)
     .first<{ removed_at: number | null }>();

@@ -31,7 +31,9 @@ export type Chat = {
 // keeps their name; pending (owner only) is shares waiting for a sign-up.
 export type Roster = {
   owner: Person;
-  members: (Person & { removed: boolean })[];
+  // seat: a username-and-code account, which can be handed a link that
+  // signs it in.
+  members: (Person & { removed: boolean; seat?: boolean })[];
   pending: { id: string; email: string }[];
 };
 
@@ -170,9 +172,33 @@ export type Bot = {
 
 export type BotRoster = {
   owner: Person;
-  members: (Person & { removed: boolean })[];
+  // seat: an account the owner made for someone without an email.
+  members: (Person & { removed: boolean; seat: boolean })[];
   pending: { id: string; email: string }[];
 };
+
+// Seats (worker/src/seats.ts): an account for someone without an email,
+// tied to one bot, signing in with a username and a code. The code comes
+// back once, here and from resetSeatCode; it's stored hashed.
+export async function createSeat(
+  botId: string,
+  seat: { username: string; name?: string; code?: string }
+): Promise<{ roster: BotRoster; seat: { id: string; username: string; name: string }; code: string }> {
+  return expectJson(await postJson(`/api/bots/${botId}/seats`, seat));
+}
+
+export async function resetSeatCode(botId: string, userId: string, code?: string): Promise<{ username: string; code: string }> {
+  return expectJson(await postJson(`/api/bots/${botId}/seats/${userId}/code`, { code }));
+}
+
+// A seat becomes a full account with this email address.
+export async function upgradeSeat(botId: string, userId: string, email: string): Promise<{ roster: BotRoster }> {
+  return expectJson(await postJson(`/api/bots/${botId}/seats/${userId}/upgrade`, { email }));
+}
+
+export async function deleteSeat(botId: string, userId: string): Promise<{ roster: BotRoster }> {
+  return expectJson(await apiFetch(`/api/bots/${botId}/seats/${userId}`, { method: "DELETE" }));
+}
 
 export async function listBots(): Promise<Bot[]> {
   return expectJson(await apiFetch("/api/bots"));
@@ -333,7 +359,16 @@ export type Me = {
   // but nobody is stopped at zero.
   creditsEnforced: boolean;
   isAdmin: boolean;
+  // Someone else's account for one bot (worker/src/seats.ts): no credits,
+  // invites, memory or bots of its own.
+  seat: boolean;
+  // False when the current terms haven't been accepted: the app asks first.
+  termsCurrent: boolean;
 };
+
+export async function acceptTerms(): Promise<void> {
+  await expectJson(await postJson("/api/me/terms", { acceptTerms: true }, "PUT"));
+}
 
 export async function getMe(): Promise<Me> {
   return expectJson(await apiFetch("/api/me"));

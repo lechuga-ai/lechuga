@@ -138,6 +138,25 @@ export function guardAlertEmail(opts: { botName: string; personName: string; cat
   };
 }
 
+// To the address a seat was just given, when its owner makes it a full
+// account (seats.ts).
+export function seatUpgradedEmail(opts: { sharerName: string; username: string; url: string; termsUrl: string }): EmailContent {
+  return {
+    subject: "Your Lechuga account is now your own",
+    text: [
+      `${opts.sharerName} has made your Lechuga account (@${opts.username}) a full account, with this email address.`,
+      "",
+      "From now on you can sign in with this address: ask for a link at the sign-in page. Your username and code still work too, if you'd rather.",
+      "",
+      "You have your own credits and invites now, and your chats are yours. Nobody reads them unless you share them.",
+      "",
+      `The terms: ${opts.termsUrl}`,
+      "",
+      opts.url,
+    ].join("\n"),
+  };
+}
+
 export function requestReceivedEmail(): EmailContent {
   return {
     subject: "We got your request",

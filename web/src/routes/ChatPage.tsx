@@ -7,6 +7,7 @@ import { AvatarStack } from "../components/Avatar";
 import { ShareDialog } from "../components/ShareDialog";
 import { ApiError, compactChat, getChat, rememberChat, sendMessage, type Me, type Message, type Model, type Person, type Roster, type Step } from "../api";
 import { takeStartMessage } from "../startMessage";
+import { appLink, copyText } from "../copy";
 import { composeMessage, estimateMessageTokens, type Attachment } from "../../../worker/src/attachments";
 import { sinceLastSummary } from "../../../worker/src/summary";
 import config from "../../../worker/config.json";
@@ -44,6 +45,8 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   const [notice, setNotice] = useState<string | null>(null);
   const [compacting, setCompacting] = useState(false);
   const [remembering, setRemembering] = useState(false);
+  // The Link button's brief thank-you.
+  const [copied, setCopied] = useState(false);
   // Whose chat this is and who's in it. A chat made a moment ago on the start
   // page is mine and has nobody else in it yet.
   const [role, setRole] = useState<"owner" | "member">("owner");
@@ -255,14 +258,16 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   const carried = sinceLastSummary(messages).reduce((n, m) => n + estimateMessageTokens(m.content), 0);
   const rate = models.find((m) => m.id === chatModel)?.credit_per_million_prompt_tokens ?? 0;
   const carriedCredits = Math.ceil((carried * rate) / 1_000_000);
-  // Compacting spends the owner's credits, so it's only offered to them.
+  // Compacting spends the payer's credits, so it's only offered to them: in
+  // someone else's bot the payer is its owner, so not there.
   const offerCompact =
-    role === "owner" && carried >= config.limits.compact_offer_tokens && streamingText === null && sinceLastSummary(messages).length >= 3;
+    role === "owner" && !botOwner && carried >= config.limits.compact_offer_tokens && streamingText === null && sinceLastSummary(messages).length >= 3;
 
   // Remember: Lechuga folds this chat into what it keeps about you (Account >
   // Memory). Only in a chat nobody else has ever been in, since the memory
   // is yours alone; the server holds the same line. Costs about a message.
-  const canRemember = role === "owner" && !isShared && (roster?.members.length ?? 0) === 0 && messages.length >= 2 && streamingText === null && !compacting;
+  const canRemember =
+    role === "owner" && !isShared && !botOwner && (roster?.members.length ?? 0) === 0 && messages.length >= 2 && streamingText === null && !compacting;
 
   async function remember() {
     setRemembering(true);
@@ -365,6 +370,20 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
                   {isShared ? "Sharing" : "Share"}
                 </button>
               )}
+              {/* The chat's address, for anyone already in it. */}
+              <button
+                type="button"
+                className="composer-share-btn"
+                title="Copy a link to this chat. It opens for anyone who's in the chat."
+                onClick={() => {
+                  void copyText(appLink(`/c/${chatId}`)).then(() => {
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1800);
+                  });
+                }}
+              >
+                {copied ? "Copied" : "Link"}
+              </button>
               {canRemember && (
                 <button
                   type="button"

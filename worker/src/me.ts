@@ -9,7 +9,7 @@ export const me = new Hono<AppEnv>();
 
 me.get("/", async (c) => {
   const row = await c.env.DB.prepare(
-    `SELECT u.name, u.username, u.username_set_at, u.invites_remaining, u.balance, u.subscription_status, a.updated_at AS photo
+    `SELECT u.name, u.username, u.username_set_at, u.invites_remaining, u.balance, u.subscription_status, u.terms_accepted_at, u.terms_version, a.updated_at AS photo
      FROM user u LEFT JOIN avatars a ON a.user_id = u.id WHERE u.id = ?`
   )
     .bind(c.get("userId"))
@@ -21,6 +21,8 @@ me.get("/", async (c) => {
       invites_remaining: number;
       balance: number;
       subscription_status: "active" | "cancelled" | null;
+      terms_accepted_at: number | null;
+      terms_version: string | null;
     }>();
   return c.json({
     id: c.get("userId"),
@@ -36,7 +38,23 @@ me.get("/", async (c) => {
     // False where credits can't be bought yet; the UI then hides the buy buttons.
     creditsEnforced: creditsEnforced(c.env),
     isAdmin: c.get("isAdmin"),
+    // Someone else's account for one bot (seats.ts): the app shows less.
+    seat: c.get("seatOf") !== null,
+    // False when the terms on record aren't the current text (config.json
+    // terms_version), or none are on record: an account made as a seat and
+    // then made full, or anyone after the terms change. The app then asks
+    // before anything else (Root.tsx). A seat is never asked: its holder
+    // answers for it.
+    termsCurrent: c.get("seatOf") !== null || (row?.terms_accepted_at !== null && row?.terms_version === config.terms_version),
   });
+});
+
+// Accepting the current terms, when /me says they aren't the ones on record.
+me.put("/terms", async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  if (body?.acceptTerms !== true) return c.json({ error: "please accept the terms to continue" }, 400);
+  await c.env.DB.prepare("UPDATE user SET terms_accepted_at = ?, terms_version = ? WHERE id = ?").bind(Date.now(), config.terms_version, c.get("userId")).run();
+  return c.json({ ok: true });
 });
 
 // The profile: a name, and a photo. Neither is required: with no name,

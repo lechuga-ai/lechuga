@@ -62,6 +62,12 @@ export function createAuth(env: Env) {
         }
       : {},
 
+    // Seats (seats.ts) sign in with a username and a code: Better Auth's
+    // email-and-password sign-in on a made-up address. Nobody can sign up
+    // this way; the only accounts with a password are the ones seats.ts
+    // makes.
+    emailAndPassword: { enabled: true, disableSignUp: true, minPasswordLength: 6 },
+
     user: {
       // Deleting is confirmed in the UI by typing "delete"; no email round
       // trip. The user row cascades to sessions, accounts, chats and
@@ -78,6 +84,8 @@ export function createAuth(env: Env) {
           fieldName: "invites_remaining",
           defaultValue: config.default_invites,
         },
+        // Who a seat belongs to (seats.ts), so every request knows.
+        seatOf: { type: "string", required: false, input: false, fieldName: "seat_of" },
       },
     },
 
@@ -150,8 +158,9 @@ export function createAuth(env: Env) {
         provider: "cloudflare-turnstile",
         secretKey: env.TURNSTILE_SECRET,
         // The plugin's default list only covers email/password endpoints.
-        // Only the link: the code's check is in the hook above.
-        endpoints: [MAGIC_LINK_PATH],
+        // The link, and a seat's username-and-code sign-in; the emailed
+        // code's check is in the hook above.
+        endpoints: [MAGIC_LINK_PATH, "/sign-in/email"],
       }),
       magicLink({
         expiresIn: MAGIC_LINK_TTL_SECONDS,

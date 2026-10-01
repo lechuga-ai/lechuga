@@ -9,6 +9,7 @@ import { admin } from "./admin";
 import { avatars, me } from "./me";
 import { memory } from "./memory";
 import { bots } from "./bots";
+import { seats } from "./seats";
 import { nightly } from "./nightly";
 import { sharing } from "./sharing";
 import { billing } from "./billing";
@@ -81,11 +82,31 @@ app.use("/api/*", async (c, next) => {
   c.set("userName", session.user.name);
   c.set("username", session.user.username ?? null);
   c.set("isAdmin", adminEmails(c.env).has(session.user.email.toLowerCase()));
+  c.set("seatOf", (session.user as { seatOf?: string | null }).seatOf ?? null);
+  await next();
+});
+
+// A seat (seats.ts) is someone else's account for one bot: it chats, and
+// that's all. No credits, invites, memory, bots of its own, or sharing.
+app.use("/api/*", async (c, next) => {
+  if (!c.get("seatOf")) return next();
+  const path = c.req.path;
+  const method = c.req.method;
+  const closed =
+    path.startsWith("/api/billing") ||
+    path.startsWith("/api/invites") ||
+    path.startsWith("/api/memory") ||
+    path.startsWith("/api/admin") ||
+    (path === "/api/bots" && method === "POST") ||
+    /^\/api\/chats\/[^/]+\/(members|pending|remember)/.test(path) ||
+    /^\/api\/bots\/[^/]+\/(members|pending|seats)/.test(path);
+  if (closed) return c.json({ error: "not available on this account" }, 403);
   await next();
 });
 
 app.route("/api/me", me);
 app.route("/api/memory", memory);
+app.route("/api/bots", seats);
 app.route("/api/bots", bots);
 app.route("/api/avatars", avatars);
 app.route("/api/invites", invites);

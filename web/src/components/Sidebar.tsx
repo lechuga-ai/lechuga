@@ -6,6 +6,7 @@ import { Avatar, AvatarStack, colourFor } from "./Avatar";
 import { InviteDialog } from "./InviteDialog";
 import { NewBotDialog } from "./NewBotDialog";
 import { BotShare } from "./BotManager";
+import { appLink, copyText } from "../copy";
 import type { Person } from "../api";
 import { Copyright } from "./SiteFooter";
 
@@ -177,9 +178,11 @@ export function Sidebar({
         placeholder="Search chats"
         aria-label="Search chats"
       />
-      <button type="button" className="new-bot-btn" onClick={() => openDialog("newBot")}>
-        <span className="new-bot-plus">+</span> New bot
-      </button>
+      {!me.seat && (
+        <button type="button" className="new-bot-btn" onClick={() => openDialog("newBot")}>
+          <span className="new-bot-plus">+</span> New bot
+        </button>
+      )}
       <div className="chat-list">
         {searching && hits !== null && hits.length === 0 && <p className="chat-list-empty">No chat has those words.</p>}
         {searching && (hits ?? []).map((chat) => chatRow(chat))}
@@ -230,6 +233,16 @@ export function Sidebar({
                         Share…
                       </button>
                     )}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setBotMenu(null);
+                        void copyText(appLink(`/b/${bot.id}`));
+                      }}
+                    >
+                      Copy link
+                    </button>
                     <Link to={`/settings/bots#${bot.id}`} role="menuitem" onClick={() => setBotMenu(null)}>
                       Bot Manager
                     </Link>
@@ -266,12 +279,7 @@ export function Sidebar({
         createPortal(
           <div className="modal-backdrop" onClick={() => setShareBot(null)}>
             <div className="modal share-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-              <BotShare bot={shareBot} onPeople={(people) => onBotPeople(shareBot.id, people)} />
-              <div className="modal-actions">
-                <button type="button" onClick={() => setShareBot(null)}>
-                  Done
-                </button>
-              </div>
+              <BotShare bot={shareBot} onPeople={(people) => onBotPeople(shareBot.id, people)} onClose={() => setShareBot(null)} />
             </div>
           </div>,
           document.body
@@ -291,9 +299,11 @@ export function Sidebar({
       <div className="sidebar-footer">
         {menuOpen && (
           <div className="account-menu" role="menu">
-            <button type="button" onClick={() => openDialog("invite")}>
-              Invites <span className="menu-count">{remaining} left</span>
-            </button>
+            {!me.seat && (
+              <button type="button" onClick={() => openDialog("invite")}>
+                Invites <span className="menu-count">{remaining} left</span>
+              </button>
+            )}
             {/* Profile, and credits: buying happens there now, so the balance
                 below is just a number. */}
             <Link to="/settings" role="menuitem" onClick={() => setMenuOpen(false)}>
@@ -331,7 +341,7 @@ export function Sidebar({
             </div>
           </div>
         )}
-        <div className={`sidebar-balance ${balance <= 0 ? "empty" : ""}`}>{balance.toLocaleString()} credits</div>
+        {!me.seat && <div className={`sidebar-balance ${balance <= 0 ? "empty" : ""}`}>{balance.toLocaleString()} credits</div>}
         <button
           type="button"
           className="account-btn"
@@ -341,7 +351,7 @@ export function Sidebar({
           title={me.email}
         >
           <Avatar person={{ id: me.id, name: me.name.trim() || me.username || me.email, username: me.username, photo: me.photo }} size={22} />
-          <span className="account-email">{me.username ? `@${me.username}` : me.email}</span>
+          <span className="account-email">{me.username ? `@${me.username}` : me.seat ? me.name : me.email}</span>
           <span className="account-caret">{menuOpen ? "▴" : "▾"}</span>
         </button>
         <Copyright className="sidebar-copyright" />
