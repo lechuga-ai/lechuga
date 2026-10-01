@@ -920,7 +920,12 @@ button {
 
 /* Home page: hero over full-bleed lettuce, marketing and footer below */
 
+/* The hero's text is light wherever the hero is, inside the signed-out
+   shell or not (the username and terms steps sit in it signed in). */
 .home {
+  --text: #fdfcf8;
+  --text-dim: rgba(253, 252, 248, 0.82);
+  --text-faint: rgba(253, 252, 248, 0.6);
   flex: 1;
   min-width: 0;
   height: 100%;

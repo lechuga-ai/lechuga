@@ -4,9 +4,10 @@ import { acceptTerms, type Me } from "../api";
 type Props = { me: Me; onDone: () => void };
 
 // The terms, asked for before anything else when the ones on record aren't
-// the current text: for nearly everyone, because the terms changed. Rarely,
-// because the account was made for someone and has just become their own
-// (worker/src/seats.ts), in which case nobody has agreed for them yet.
+// the current text: for nearly everyone, because the terms changed. With
+// none on record (an account from before the terms were tracked, or one
+// made for someone and just made their own, worker/src/seats.ts) it says
+// less, since it can't tell which.
 export function AcceptTerms({ me, onDone }: Props) {
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -40,7 +41,7 @@ export function AcceptTerms({ me, onDone }: Props) {
             <p className="signin-lead">
               {changed
                 ? "We've updated the terms and the privacy policy since you last agreed to them. Have a look, and tick the box to carry on."
-                : "This account is yours now. Before you go on, please read the terms and the privacy policy and agree to them."}
+                : "Before you go on, please read the terms and the privacy policy and agree to them."}
             </p>
             <label className="signin-agree">
               <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} disabled={busy} />
