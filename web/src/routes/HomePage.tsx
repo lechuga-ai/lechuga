@@ -49,6 +49,10 @@ export const HOME_SECTIONS: Section[] = [
         text:
           "We started it because we wanted somewhere to send our friends. Open source models turned out to be surprisingly good, good enough for nearly everything people actually use a chat assistant for, and we didn't see why using one should mean running your own server or reading pages of documentation first. So we built the easy version: sign in, type, get an answer, and pay only for what it costs.",
       },
+      {
+        text:
+          "Every chat is with a bot. You start with one, called Seed, and make more by naming them for a job (Sous Chef, Homework Helper): Lechuga works out from the name how each should behave, and you can rewrite that. A chat or a bot can be yours alone, shared with people you choose, or open to everyone on Lechuga. Someone you share a bot with gets their own chats with it, which you can read; that's also how you set one up for someone who has no email address, with a username and a code, and how you make a bot that stays suitable for a young person, with a guard that checks every message.",
+      },
     ],
   },
   {
@@ -113,6 +117,10 @@ export const HOME_SECTIONS: Section[] = [
         text:
           "Your messages are stored in our database on Cloudflare so you can come back to them, and that's the only place they go. They aren't used to train anything, they aren't sold, and we don't have advertisers to share them with. We don't read them either. Delete a chat and it's gone, and delete your account and everything goes with it.",
       },
+      {
+        text:
+          "Nothing is seen by anyone else unless you choose it. A chat you share is read by the people you shared it with; a chat you make public is read by everyone on Lechuga, with your name on it, and you can make it private again. A bot can carry a short note about you from one chat to the next; it's yours to read, edit or wipe under Account, and it never goes into a chat anyone else can see.",
+      },
     ],
   },
   {
@@ -121,7 +129,7 @@ export const HOME_SECTIONS: Section[] = [
     paragraphs: [
       {
         text:
-          "There's no image generation, no video, no \"uncensored\" mode, no characters to talk to, no API and no enterprise plan. If you need those things, there are plenty of companies that would be happy to sell them to you.",
+          "There's no image generation, no video, no \"uncensored\" mode, no API and no enterprise plan. If you need those things, there are plenty of companies that would be happy to sell them to you.",
       },
     ],
   },

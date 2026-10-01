@@ -35,6 +35,18 @@ const FAQS: { q: string; a: ReactNode }[] = [
     ),
   },
   {
+    q: "What's a bot?",
+    a: "An assistant with a job. You start with Seed, which is Lechuga as it comes; make more from New bot on the left by naming them, and Lechuga drafts how each should behave from the name. Every chat is with one bot. Bot Manager, under Account, is where you rewrite that, pick a model, or share it.",
+  },
+  {
+    q: "Who can see my chats?",
+    a: "You, unless you choose otherwise. Share, on a chat or a bot, has three settings: only me, people I choose, or everyone on Lechuga. Faces next to a chat or a bot mean it's shared; a ◎ means it's public. A chat with a bot someone shared with you is read by them too, and it says so at the top.",
+  },
+  {
+    q: "Can I set it up for someone who has no email?",
+    a: "Yes. In a bot's sharing, make them a username and a code. That's an account of its own for that bot only, with no credits or invites; you can read its chats, hand out a new code, and later give it an email address to make it a full account. For a young person, turn Guarded on in Bot Manager as well.",
+  },
+  {
     q: "Can I get a refund?",
     a: "Credits aren't refundable as a rule, but we try to be fair if something went wrong — write in below or to hello@lechuga.ai.",
   },
@@ -77,6 +89,9 @@ export function HelpPage({ me }: Props) {
           <li>Drag a file onto the page (a PDF, a document, a spreadsheet, code, or a picture if you're on GLM 5.3 Flash), or paste in something long, and it becomes a card attached to your message.</li>
           <li>Next to the model is how hard it should think. Low is quick and cheap; high is slower and better on hard problems. The ? beside them explains both.</li>
           <li>Pick a model under the box before you start a chat. A chat keeps the model it started with.</li>
+          <li>Bots are the groups on the left, each with its chats under it. The dots beside a bot's name start a new chat with it, share it, or open it in Bot Manager; the dots beside a chat share it, copy its link, or delete it.</li>
+          <li>Share, on a chat or a bot, is a setting: only me, people I choose, or everyone on Lechuga. Nothing changes until you press Done, which asks once. Public in the menu behind your name lists everything that's open to everyone; the search box finds public chats too.</li>
+          <li>A bot can remember a little about you between chats. Remember, beside Share in a chat, folds that chat in; so does an overnight pass. Read, edit or wipe it under Account, then Memory.</li>
           <li>The box above your chats searches them: type a word or two and the list shows the chats that mention them.</li>
           <li>Your credit balance is in the sidebar. To buy more or manage a subscription, choose Account from the menu behind your name, then Credits.</li>
           <li>Your name and photo are under Account too. <Link to="/welcome">About Lechuga</Link>, in the list on the left, is what this is and who made it.</li>
