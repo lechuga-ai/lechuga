@@ -1,7 +1,24 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { addChatMember, cancelPendingShare, getChat, makeChatPublic, removeChatMember, searchChats, type Bot, type Chat, type ChatHit, type Me, type Person, type Roster } from "../api";
+import {
+  addChatMember,
+  cancelPendingShare,
+  createSeat,
+  deleteSeat,
+  getChat,
+  makeChatPublic,
+  removeChatMember,
+  resetSeatCode,
+  searchChats,
+  upgradeSeat,
+  type Bot,
+  type Chat,
+  type ChatHit,
+  type Me,
+  type Person,
+  type Roster,
+} from "../api";
 import { SharingDialog } from "./Sharing";
 import { Avatar, AvatarStack, colourFor } from "./Avatar";
 import { InviteDialog } from "./InviteDialog";
@@ -392,6 +409,25 @@ export function Sidebar({
               remove: (userId) => removeChatMember(shareChat.chat.id, userId),
               cancelPending: (id) => cancelPendingShare(shareChat.chat.id, id),
               makePublic: () => makeChatPublic(shareChat.chat.id),
+              seats:
+                shareChat.chat.bot_id && !shareChat.botOwner && !me.seat
+                  ? {
+                      create: async (username) => {
+                        const made = await createSeat(shareChat.chat.bot_id!, { username });
+                        const r = await addChatMember(shareChat.chat.id, made.seat.username);
+                        return { roster: r.roster, seat: made.seat, code: made.code };
+                      },
+                      newCode: (userId) => resetSeatCode(shareChat.chat.bot_id!, userId),
+                      remove: async (userId) => {
+                        await deleteSeat(shareChat.chat.bot_id!, userId);
+                        return { roster: (await getChat(shareChat.chat.id)).roster };
+                      },
+                      upgrade: async (userId, email) => {
+                        await upgradeSeat(shareChat.chat.bot_id!, userId, email);
+                        return { roster: (await getChat(shareChat.chat.id)).roster };
+                      },
+                    }
+                  : undefined,
               onRoster: (r) => setShareChat({ ...shareChat, roster: r as Roster }),
               onPublic: () => setShareChat({ ...shareChat, chat: { ...shareChat.chat, visibility: "public" } }),
               onPrivate: () => void openChatSharing({ ...shareChat.chat, visibility: "private" }),

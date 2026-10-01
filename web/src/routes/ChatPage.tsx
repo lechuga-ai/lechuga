@@ -5,7 +5,7 @@ import { MessageList } from "../components/MessageList";
 import { Composer } from "../components/Composer";
 import { AvatarStack } from "../components/Avatar";
 import { SharingDialog } from "../components/Sharing";
-import { ApiError, addChatMember, cancelPendingShare, compactChat, getChat, makeChatPublic, rememberChat, removeChatMember, sendMessage, type Me, type Message, type Model, type Person, type Roster, type Step } from "../api";
+import { ApiError, addChatMember, cancelPendingShare, compactChat, createSeat, deleteSeat, getChat, makeChatPublic, rememberChat, removeChatMember, resetSeatCode, sendMessage, upgradeSeat, type Me, type Message, type Model, type Person, type Roster, type Step } from "../api";
 import { takeStartMessage } from "../startMessage";
 import { appLink, copyText } from "../copy";
 import { composeMessage, estimateMessageTokens, type Attachment } from "../../../worker/src/attachments";
@@ -38,6 +38,8 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   const [botName, setBotName] = useState(expectedBotName);
   // Set when the chat is with someone else's bot: they can see it.
   const [botOwner, setBotOwner] = useState<Person | null>(null);
+  // The chat's bot, for making a username-and-code account from here.
+  const [botId, setBotId] = useState<string | null>(null);
   // Public: anyone can read and join; Lechuga pays. Set from the chat row.
   const [isPublic, setIsPublic] = useState(false);
   // "Asked before": public chats that opened with this chat's first words.
@@ -89,6 +91,7 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
         setChatModel(chat.model);
         setBotName(bot.name);
         setBotOwner(bot.owner);
+        setBotId(bot.id);
         setIsPublic(chat.visibility === "public");
         setMessages(history);
         setRole(myRole);
@@ -323,6 +326,29 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
               remove: (userId) => removeChatMember(chatId, userId),
               cancelPending: (id) => cancelPendingShare(chatId, id),
               makePublic: () => makeChatPublic(chatId),
+              // A username-and-code account made from a chat: in the chat's
+              // bot (mine, not guarded is checked by the worker), and given
+              // this chat. Its code and its end are the bot's routes; the
+              // chat's roster is re-read after.
+              seats:
+                botId && !botOwner && !me.seat
+                  ? {
+                      create: async (username) => {
+                        const made = await createSeat(botId, { username });
+                        const r = await addChatMember(chatId, made.seat.username);
+                        return { roster: r.roster, seat: made.seat, code: made.code };
+                      },
+                      newCode: (userId) => resetSeatCode(botId, userId),
+                      remove: async (userId) => {
+                        await deleteSeat(botId, userId);
+                        return { roster: (await getChat(chatId)).roster };
+                      },
+                      upgrade: async (userId, email) => {
+                        await upgradeSeat(botId, userId, email);
+                        return { roster: (await getChat(chatId)).roster };
+                      },
+                    }
+                  : undefined,
               onRoster: (r) => {
                 setRoster(r as Roster);
                 void refreshChats();

@@ -4238,6 +4238,40 @@ button {
   white-space: nowrap;
 }
 
+/* The question before something that takes access away, in the panel's place. */
+.sharing-confirm h3 {
+  margin: 0 0 10px;
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.modal .sharing-confirm p,
+.doc-inner .settings-panel .sharing-confirm p {
+  font-size: 13.5px;
+}
+
+.sharing-rules {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--box-text);
+}
+
+.sharing-rules li {
+  margin-bottom: 4px;
+}
+
+.share-people.compact {
+  margin-top: 6px;
+  font-size: 13px;
+}
+
+.share-people.compact li {
+  padding: 5px 2px;
+}
+
 .sharing-tell-label {
   font-size: 13.5px;
   color: var(--box-text);

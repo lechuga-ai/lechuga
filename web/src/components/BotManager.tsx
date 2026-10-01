@@ -282,14 +282,7 @@ export function BotShare({
     <>
       {onClose && <h2>Sharing: {bot.name}</h2>}
       {error && <p className="modal-error">{error}</p>}
-      {target ? <SharingPanel target={target} /> : !error && <p className="settings-count">loading…</p>}
-      {onClose && (
-        <div className="modal-actions">
-          <button type="button" onClick={onClose}>
-            Done
-          </button>
-        </div>
-      )}
+      {target ? <SharingPanel target={target} onClose={onClose} /> : !error && <p className="settings-count">loading…</p>}
     </>
   );
 }
