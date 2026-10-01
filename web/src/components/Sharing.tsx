@@ -304,13 +304,15 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
           <input type="radio" name={`sharing-${t.id}`} checked={level === "me"} disabled={busy} onChange={() => setLevel("me")} />
           <span>
             <b>Only me</b>
-            {level === "me" && current !== "me" && (
-              <span className="sharing-why">
-                {t.isPublic
-                  ? `Press Done to make ${thing} private again.`
-                  : `Press Done to stop sharing: ${count === 1 ? "the one person" : `all ${count} people`} below lose sight of ${thing}.`}
-              </span>
-            )}
+            <span className="sharing-why">
+              {level === "me" && current !== "me"
+                ? t.isPublic
+                  ? `Private: nobody else sees it. Press Done to make ${thing} private again.`
+                  : `Private: nobody else sees it. Press Done to stop sharing: ${count === 1 ? "the one person" : `all ${count} people`} below lose sight of ${thing}.`
+                : t.kind === "chat"
+                  ? "Private: nobody else sees it, and it's on your credits."
+                  : "Private: only you can chat with it, and it's on your credits."}
+            </span>
           </span>
         </label>
         {level === "me" && current === "people" && (
