@@ -139,23 +139,15 @@ const NEWS: NewsEntry[] = [
       },
       {
         lead: "Each bot has its own chats.",
-        text: "On the left, every bot is a group with a bar down its side in its own colour, its name at the top and its chats underneath. Chats people have shared with you sit at the bottom, and the search box at the top looks across everything.",
+        text: "On the left, every bot is a group with a bar down its side in its own colour, its name at the top and its chats underneath. The dots beside its name start a new chat with it, share it, copy its link, or open it in Bot Manager. The search box at the top looks across everything.",
       },
       {
-        lead: "Share a bot.",
-        text: "Share…, in the dots beside a bot's name (or at the foot of the bot in Bot Manager): add someone by username or email. They get the bot in their own list and their own chats with it; you see every one of those chats and can join in, and they're told so, on the bot and in each chat; the replies come out of your credits. Nothing they tell it is kept about them, and nothing Lechuga remembers about you reaches them. A member can leave from the same page.",
+        lead: "Bot Manager.",
+        text: "A page under Account with every bot on it: its name, the model its new chats start on, how it behaves, which you can rewrite from scratch, and who it's shared with. From a bot's dots it lands on that bot.",
       },
       {
         lead: "A guarded bot.",
-        text: "A switch on a bot in Bot Manager. On, the bot keeps everything it says suitable for a young person, however a request is framed, and can't search the web. Every message is checked before the bot sees it: if someone brings up hurting themselves or others, or weapons, the bot stops, tells them to talk to a trusted adult, and emails the bot's owner; explicit requests are simply refused. Anyone the bot is shared with is told it's guarded.",
-      },
-      {
-        lead: "An account for someone without an email.",
-        text: "In a bot's sharing, make them a username and a code instead. It's an account of its own, for that bot only: no credits, no invites, no bots of its own, and you can read every chat it has, hand out a new code, or remove it. They sign in at the usual place with \"I have a username and a code\". When the time comes, give it an email address and it becomes a full account, theirs.",
-      },
-      {
-        lead: "Three dots beside a bot's name.",
-        text: "New chat starts one with that bot. Bot Manager is a page under Account with every bot on it: its name, the model its new chats start on, and how it behaves, which you can rewrite from scratch. From the dots it lands on that bot.",
+        text: "A switch in Bot Manager. On, the bot keeps everything it says suitable for a young person, however a request is framed, and can't search the web. Every message is checked before the bot sees it: if someone brings up hurting themselves or others, or weapons, the bot stops, tells them to talk to a trusted adult, and emails the bot's owner; explicit requests are simply refused. Anyone the bot is shared with is told it's guarded.",
       },
       {
         lead: "Memory is yours; the soul is the bot's.",
