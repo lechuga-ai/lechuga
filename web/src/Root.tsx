@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import App from "./App";
 import { Visitor } from "./Visitor";
 import { Username } from "./components/Username";
+import { AcceptTerms } from "./components/AcceptTerms";
 import { Admin } from "./components/Admin";
 import { Legal } from "./components/Legal";
 import { WhatsNewPage } from "./routes/StaticPages";
@@ -53,6 +54,19 @@ export default function Root() {
         <Route path="/terms" element={<Legal page="terms" />} />
         <Route path="/privacy" element={<Legal page="privacy" />} />
         <Route path="*" element={<Username onDone={(username) => setMe({ ...me, username })} />} />
+      </Routes>
+    );
+  }
+
+  // The terms, when the ones on record aren't the current text, or none are:
+  // an account that was made for someone and has just become their own, or
+  // anyone after the terms change. Same shape as the username step.
+  if (!me.termsCurrent) {
+    return (
+      <Routes>
+        <Route path="/terms" element={<Legal page="terms" />} />
+        <Route path="/privacy" element={<Legal page="privacy" />} />
+        <Route path="*" element={<AcceptTerms me={me} onDone={() => setMe({ ...me, termsCurrent: true })} />} />
       </Routes>
     );
   }

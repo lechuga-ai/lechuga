@@ -4,8 +4,8 @@ type Props = { page: "terms" | "privacy" };
 
 // The terms and privacy pages. People accept the terms on the username step,
 // and worker/config.json's terms_version records which text that was: bump it
-// whenever the meaning here changes, along with the "last updated" line.
-// (Asking people on an older version to accept again isn't built yet.)
+// whenever the meaning here changes, along with the "last updated" line, and
+// everyone is asked to agree again on their next visit (AcceptTerms.tsx).
 export function Legal({ page }: Props) {
   const title = page === "terms" ? "Terms of service" : "Privacy";
   return (

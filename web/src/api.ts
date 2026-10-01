@@ -360,7 +360,13 @@ export type Me = {
   // Someone else's account for one bot (worker/src/seats.ts): no credits,
   // invites, memory or bots of its own.
   seat: boolean;
+  // False when the current terms haven't been accepted: the app asks first.
+  termsCurrent: boolean;
 };
+
+export async function acceptTerms(): Promise<void> {
+  await expectJson(await postJson("/api/me/terms", { acceptTerms: true }, "PUT"));
+}
 
 export async function getMe(): Promise<Me> {
   return expectJson(await apiFetch("/api/me"));

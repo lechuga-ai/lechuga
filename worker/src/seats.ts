@@ -135,7 +135,11 @@ seats.post("/:id/seats/:userId/upgrade", async (c) => {
   if (!email) return c.json({ error: "that doesn't look like an email address" }, 400);
   if (await hasAccount(c.env, email)) return c.json({ error: "that address already has an account" }, 409);
 
-  await c.env.DB.prepare("UPDATE user SET email = ?, emailVerified = 0, seat_of = NULL, invites_remaining = ?, updatedAt = ? WHERE id = ?")
+  // The terms were accepted on its behalf when it was made; now it's
+  // someone's own, they accept them themselves on their first visit.
+  await c.env.DB.prepare(
+    "UPDATE user SET email = ?, emailVerified = 0, seat_of = NULL, invites_remaining = ?, terms_accepted_at = NULL, terms_version = NULL, updatedAt = ? WHERE id = ?"
+  )
     .bind(email, config.default_invites, new Date().toISOString(), seatId)
     .run();
   // Keyed by user id, so it lands once even if this is somehow repeated.
