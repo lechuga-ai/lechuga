@@ -900,6 +900,38 @@ button {
   display: none;
 }
 
+/* The chat's dots, where the ✕ was: shown on hover, like it. */
+.chat-dots {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: #98a092;
+  font-size: 15px;
+  line-height: 1;
+  visibility: hidden;
+}
+
+.chat-list-item:hover .chat-dots,
+.chat-dots[aria-expanded="true"] {
+  visibility: visible;
+}
+
+.chat-dots:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1e221b;
+}
+
+.chat-list-item {
+  position: relative;
+}
+
+.chat-row-menu {
+  top: calc(100% - 4px);
+  font-weight: 400;
+}
+
 .chat-list-item:hover .chat-delete {
   display: block;
 }

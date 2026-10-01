@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { searchChats, type Bot, type Chat, type ChatHit, type Me } from "../api";
+import { addChatMember, cancelPendingShare, getChat, makeChatPublic, removeChatMember, searchChats, type Bot, type Chat, type ChatHit, type Me, type Person, type Roster } from "../api";
+import { SharingDialog } from "./Sharing";
 import { Avatar, AvatarStack, colourFor } from "./Avatar";
 import { InviteDialog } from "./InviteDialog";
 import { NewBotDialog } from "./NewBotDialog";
 import { BotShare } from "./BotManager";
 import { appLink, copyText } from "../copy";
-import type { Person } from "../api";
 import { Copyright } from "./SiteFooter";
 
 type Props = {
@@ -21,6 +21,8 @@ type Props = {
   onBotPeople: (botId: string, people: Person[] | undefined) => void;
   // A bot changed in the share dialog (made public).
   onBotUpdated: (bot: Bot) => void;
+  // After the share dialog closes: re-read the list, since faces and ◎ may have changed.
+  onChatsChanged: () => Promise<void>;
   activeChatId: string | null;
   open: boolean;
   onSelect: (id: string) => void;
@@ -60,6 +62,7 @@ export function Sidebar({
   onBotStart,
   onBotPeople,
   onBotUpdated,
+  onChatsChanged,
   activeChatId,
   open,
   onSelect,
@@ -75,6 +78,19 @@ export function Sidebar({
   // Which bot's dots are open, if any; and which bot's share dialog.
   const [botMenu, setBotMenu] = useState<string | null>(null);
   const [shareBot, setShareBot] = useState<Bot | null>(null);
+  // Likewise for a chat: its dots, and its share dialog, for which the
+  // chat is fetched (who's in it, whether it's public, whose bot).
+  const [chatMenu, setChatMenu] = useState<string | null>(null);
+  const [shareChat, setShareChat] = useState<{ chat: Chat; roster: Roster; botOwner: Person | null } | null>(null);
+
+  async function openChatSharing(chat: Chat) {
+    try {
+      const full = await getChat(chat.id);
+      setShareChat({ chat: full.chat, roster: full.roster, botOwner: full.bot.owner });
+    } catch {
+      // gone; the list refresh will say so
+    }
+  }
   const [remaining, setRemaining] = useState(me.invitesRemaining);
   // The search box. While it has words in it the list below is the server's
   // answer (title or message text containing every word), each with a line
@@ -87,14 +103,17 @@ export function Sidebar({
     return () => clearInterval(id);
   }, []);
 
-  // A click anywhere else closes a bot's dots menu; the dots themselves
-  // stop the click so they can toggle it.
+  // A click anywhere else closes a dots menu; the dots themselves stop the
+  // click so they can toggle it.
   useEffect(() => {
-    if (!botMenu) return;
-    const close = () => setBotMenu(null);
+    if (!botMenu && !chatMenu) return;
+    const close = () => {
+      setBotMenu(null);
+      setChatMenu(null);
+    };
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
-  }, [botMenu]);
+  }, [botMenu, chatMenu]);
 
   useEffect(() => {
     const q = query.trim();
@@ -148,17 +167,57 @@ export function Sidebar({
         {/* Shared: everyone in it, the owner ringed. */}
         {chat.people && <AvatarStack people={chat.people} ownerId={chat.user_id} size={16} max={3} />}
         <span className="chat-age">{ageLabel(chat.updated_at, now)}</span>
+        {/* The chat's dots: Share…, Copy link, and Delete or Leave. */}
         <button
-          className="chat-delete"
+          type="button"
+          className="chat-dots"
           onClick={(e) => {
             e.stopPropagation();
-            onDelete(chat.id);
+            setBotMenu(null);
+            setChatMenu((cur) => (cur === chat.id ? null : chat.id));
           }}
-          aria-label={chat.user_id === me.id ? "Delete chat" : "Leave chat"}
-          title={chat.user_id === me.id ? "Delete chat" : "Leave chat"}
+          aria-expanded={chatMenu === chat.id}
+          aria-haspopup="menu"
+          aria-label="Chat menu"
         >
-          ✕
+          ⋮
         </button>
+        {chatMenu === chat.id && (
+          <div className="bot-row-menu chat-row-menu" role="menu" onClick={(e) => e.stopPropagation()}>
+            {chat.user_id === me.id && !me.seat && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setChatMenu(null);
+                  void openChatSharing(chat);
+                }}
+              >
+                Share…
+              </button>
+            )}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setChatMenu(null);
+                void copyText(appLink(`/c/${chat.id}`));
+              }}
+            >
+              Copy link
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setChatMenu(null);
+                onDelete(chat.id);
+              }}
+            >
+              {chat.user_id === me.id || bots.some((b) => b.id === chat.bot_id && b.role === "owner") ? "Delete" : "Leave"}
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -316,6 +375,31 @@ export function Sidebar({
               />
             </div>
           </div>,
+          document.body
+        )}
+      {shareChat &&
+        createPortal(
+          <SharingDialog
+            target={{
+              kind: "chat",
+              id: shareChat.chat.id,
+              name: shareChat.chat.title ?? "this chat",
+              roster: shareChat.roster,
+              isPublic: shareChat.chat.visibility === "public",
+              canPublic: !shareChat.botOwner && !me.seat,
+              publicReason: shareChat.botOwner ? "A chat with someone else's bot can't be made public." : undefined,
+              add: (who, useInvite) => addChatMember(shareChat.chat.id, who, useInvite),
+              remove: (userId) => removeChatMember(shareChat.chat.id, userId),
+              cancelPending: (id) => cancelPendingShare(shareChat.chat.id, id),
+              makePublic: () => makeChatPublic(shareChat.chat.id),
+              onRoster: (r) => setShareChat({ ...shareChat, roster: r as Roster }),
+              onPublic: () => setShareChat({ ...shareChat, chat: { ...shareChat.chat, visibility: "public" } }),
+            }}
+            onClose={() => {
+              setShareChat(null);
+              void onChatsChanged();
+            }}
+          />,
           document.body
         )}
       {dialog === "newBot" &&
