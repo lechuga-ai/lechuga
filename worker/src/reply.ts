@@ -13,6 +13,7 @@ import config from "../config.json";
 //
 // Events, in the order they can appear:
 //   {notice}            once, if the caller has something to say first
+//   {related}           once, if public chats have covered this already: [{id, title}]
 //   {reasoning}         the model thinking, in pieces
 //   {step: {id, label, links?, done}}  a tool starting (done false) and finishing
 //   {delta}             the answer, in pieces
@@ -43,7 +44,7 @@ export function runReply(
   env: Env,
   model: string,
   turns: ChatTurn[],
-  opts: { maxTokens: number; effort: string; tools: ToolDef[]; notice?: string }
+  opts: { maxTokens: number; effort: string; tools: ToolDef[]; notice?: string; related?: { id: string; title: string | null }[] }
 ): { stream: ReadableStream<Uint8Array>; done: Promise<ReplyOutcome> } {
   const encoder = new TextEncoder();
   let resolveDone!: (o: ReplyOutcome) => void;
@@ -59,6 +60,7 @@ export function runReply(
         }
       };
       if (opts.notice) send({ notice: opts.notice });
+      if (opts.related && opts.related.length > 0) send({ related: opts.related });
 
       const messages: ChatTurn[] = [...turns];
       const outcome: ReplyOutcome = { text: "", promptTokens: 0, completionTokens: 0, toolCredits: 0, toolCostUsd: 0, steps: [], toolUses: [] };

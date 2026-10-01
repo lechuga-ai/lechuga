@@ -84,6 +84,34 @@ type NewsEntry = { date: string; title: string; intro: string; items: { lead: st
 
 const NEWS: NewsEntry[] = [
   {
+    date: "October 1, 2026",
+    title: "Public chats and bots",
+    intro:
+      "A chat or a bot of yours can now be opened to everyone on Lechuga: anyone can read it and join in, and the replies are on us. Public is a property of the thing, like shared, and it's marked with a ◎ where the thing is. And when a question has been answered in public before, you're told.",
+    items: [
+      {
+        lead: "Make a chat public.",
+        text: "In the chat's Share dialog, at the bottom. Everyone on Lechuga can then read all of it and join in, and the replies come out of Lechuga's credits instead of yours. Your name is on it, and it can't be made private again, though you can still delete it. Only a chat with your own bot, and not a guarded one.",
+      },
+      {
+        lead: "Make a bot public.",
+        text: "In the bot's Share dialog. Anyone can then find it and chat with it, and everything in it is public: the chats you've had with it so far, and every chat anyone has with it from then on. Its replies are on Lechuga from then on. Not a guarded bot, and not one you've shared with people, since that would publish their chats.",
+      },
+      {
+        lead: "Finding them.",
+        text: "The search box on the left finds public chats along with your own; public ones carry the ◎. For browsing without a question, Public in the menu behind your name lists every public bot and chat, newest first. A public chat you've typed in joins your list under Public chats I've joined; a public bot you've chatted with joins your bots.",
+      },
+      {
+        lead: "Asked before.",
+        text: "When you start a chat with a question that a public chat opened with too, a line above the reply points to it. The bot is shown the first answer from the closest one, so it can say \"this was answered here\" and add only what's different, rather than start from scratch.",
+      },
+      {
+        lead: "Limits, so it stays sustainable.",
+        text: "Public chats together have a daily allowance of Lechuga's credits, and each person a daily number of messages in them. When either runs out, public chats pause until tomorrow; your own chats aren't affected.",
+      },
+    ],
+  },
+  {
     date: "September 29, 2026",
     title: "Bots",
     intro:

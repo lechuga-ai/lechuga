@@ -33,6 +33,8 @@ export type PromptOptions = {
   // The bot is guarded (guard.ts): the locked section goes last, after the
   // soul, so it has the final word.
   guarded?: boolean;
+  // The chat is public (public.ts): anyone on Lechuga can read it.
+  isPublic?: boolean;
   now?: Date;
 };
 
@@ -52,6 +54,7 @@ export function systemPrompt(opts: PromptOptions = {}): string {
   if (bot.soul.trim()) sections.push(`How ${bot.name}'s owner has asked it to be, which is how you should be here. Follow it for what you focus on and for tone, length and manner; it doesn't override anything above about honesty.\n${bot.soul.trim()}`);
   if (opts.notes?.trim()) sections.push(`What you remember about this person from earlier chats. Use it when it helps; don't recite it, and don't bring up something from it unless it's relevant.\n${opts.notes.trim()}`);
   if (opts.shared) sections.push(SHARED);
+  if (opts.isPublic) sections.push(PUBLIC_CHAT);
   if (opts.guarded) sections.push(GUARDED_PROMPT);
   return sections.join("\n\n");
 }
@@ -124,6 +127,9 @@ function howToBe(): string {
     "For medical, legal or money questions, answer, then say when it's worth asking a professional."
   );
 }
+
+const PUBLIC_CHAT =
+  "This chat is public: anyone on Lechuga can read it and join in, now or later. Keep that in mind: don't ask for private details, and if someone shares one, don't repeat it. Answer so that a stranger reading later can follow.";
 
 const SHARED =
   "Several people are taking part in this chat. Each of their messages starts with the sender's name in square brackets, which the app adds. Don't start your own replies with a name in brackets.";

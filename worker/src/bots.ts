@@ -50,7 +50,10 @@ export async function listBots(env: Env, userId: string, seat = false): Promise<
   const [{ results: mine }, { results: shared }, { results: memberRows }] = await Promise.all([
     env.DB.prepare("SELECT * FROM bots WHERE user_id = ? ORDER BY is_default DESC, created_at ASC").bind(userId).all<BotRow>(),
     env.DB.prepare(
-      "SELECT b.* FROM bots b JOIN bot_members m ON m.bot_id = b.id WHERE m.user_id = ? AND m.removed_at IS NULL ORDER BY m.added_at ASC"
+      `SELECT b.* FROM bots b JOIN bot_members m ON m.bot_id = b.id WHERE m.user_id = ?1 AND m.removed_at IS NULL
+       UNION
+       SELECT b.* FROM bots b WHERE b.visibility = 'public' AND b.user_id != ?1 AND EXISTS (SELECT 1 FROM chats c WHERE c.bot_id = b.id AND c.user_id = ?1)
+       ORDER BY created_at ASC`
     )
       .bind(userId)
       .all<BotRow>(),
@@ -80,7 +83,7 @@ export async function listBots(env: Env, userId: string, seat = false): Promise<
 export async function defaultBot(env: Env, userId: string): Promise<BotRow> {
   const found = await env.DB.prepare("SELECT * FROM bots WHERE user_id = ? AND is_default = 1").bind(userId).first<BotRow>();
   if (found) return found;
-  const bot: BotRow = { id: crypto.randomUUID(), user_id: userId, name: DEFAULT_NAME, soul: "", model: null, is_default: 1, guarded: 0, created_at: Date.now(), updated_at: Date.now() };
+  const bot: BotRow = { id: crypto.randomUUID(), user_id: userId, name: DEFAULT_NAME, soul: "", model: null, is_default: 1, guarded: 0, visibility: "private", created_at: Date.now(), updated_at: Date.now() };
   await env.DB.prepare("INSERT INTO bots (id, user_id, name, soul, model, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?)")
     .bind(bot.id, userId, bot.name, bot.soul, bot.model, bot.created_at, bot.updated_at)
     .run();
@@ -97,14 +100,16 @@ export async function botFor(env: Env, chat: ChatRow): Promise<BotRow> {
   return defaultBot(env, chat.user_id);
 }
 
-// A bot I own or have been let into, with which. Anyone else's looks the
-// same as no bot at all (null), so ids can't be probed.
-export async function botAccess(env: Env, botId: string, userId: string): Promise<{ bot: BotRow; role: BotRole } | null> {
+// A bot I own, have been let into, or that's public (public.ts), with
+// which. Anyone else's looks the same as no bot at all (null), so ids can't
+// be probed. seat: a username-and-code account, which keeps to the bots it
+// was given: no public ones.
+export async function botAccess(env: Env, botId: string, userId: string, seat = false): Promise<{ bot: BotRow; role: BotRole } | null> {
   const bot = await env.DB.prepare(
-    `SELECT b.* FROM bots b WHERE b.id = ?1 AND (b.user_id = ?2 OR EXISTS (
+    `SELECT b.* FROM bots b WHERE b.id = ?1 AND (b.user_id = ?2 OR (b.visibility = 'public' AND ?3 = 0) OR EXISTS (
        SELECT 1 FROM bot_members m WHERE m.bot_id = b.id AND m.user_id = ?2 AND m.removed_at IS NULL))`
   )
-    .bind(botId, userId)
+    .bind(botId, userId, seat ? 1 : 0)
     .first<BotRow>();
   return bot ? { bot, role: bot.user_id === userId ? "owner" : "member" } : null;
 }
@@ -189,7 +194,7 @@ bots.post("/", async (c) => {
   const userId = c.get("userId");
   await defaultBot(c.env, userId);
   const now = Date.now();
-  const bot: BotView = { id: crypto.randomUUID(), user_id: userId, name, soul: "", model, is_default: 0, guarded: 0, created_at: now, updated_at: now, role: "owner" };
+  const bot: BotView = { id: crypto.randomUUID(), user_id: userId, name, soul: "", model, is_default: 0, guarded: 0, visibility: "private", created_at: now, updated_at: now, role: "owner" };
   await c.env.DB.prepare("INSERT INTO bots (id, user_id, name, soul, model, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 0, ?, ?)")
     .bind(bot.id, userId, name, "", model, now, now)
     .run();
@@ -236,6 +241,7 @@ bots.put("/:id", async (c) => {
     next.model = body.model;
   }
   if (typeof body?.guarded === "boolean") next.guarded = body.guarded ? 1 : 0;
+  if (next.guarded && bot.visibility === "public") return c.json({ error: "a public bot can't be guarded; everything in it is already everyone's" }, 400);
   next.updated_at = Date.now();
   await c.env.DB.prepare("UPDATE bots SET name = ?, soul = ?, model = ?, guarded = ?, updated_at = ? WHERE id = ?")
     .bind(next.name, next.soul, next.model, next.guarded, next.updated_at, bot.id)

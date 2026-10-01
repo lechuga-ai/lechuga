@@ -19,6 +19,8 @@ type Props = {
   onBotStart: (bot: Bot) => void;
   // Who has a bot changed (the share dialog), so its faces follow.
   onBotPeople: (botId: string, people: Person[] | undefined) => void;
+  // A bot changed in the share dialog (made public).
+  onBotUpdated: (bot: Bot) => void;
   activeChatId: string | null;
   open: boolean;
   onSelect: (id: string) => void;
@@ -57,6 +59,7 @@ export function Sidebar({
   onBotCreated,
   onBotStart,
   onBotPeople,
+  onBotUpdated,
   activeChatId,
   open,
   onSelect,
@@ -125,12 +128,21 @@ export function Sidebar({
   // Never lose a chat: one whose bot isn't in the list (the bots didn't
   // load, or a row points somewhere odd) still shows, under a plain heading.
   const orphans = chats.filter((c) => c.user_id === me.id && botOf(c) === null);
-  // Chats others started and let me into, one at a time.
-  const sharedWithMe = chats.filter((c) => c.user_id !== me.id && !bots.some((b) => inGroup(c, b)));
+  // Chats others started and let me into, one at a time; and the public
+  // ones I've joined, apart.
+  const notMine = chats.filter((c) => c.user_id !== me.id && !bots.some((b) => inGroup(c, b)));
+  const sharedWithMe = notMine.filter((c) => c.visibility !== "public");
+  const publicJoined = notMine.filter((c) => c.visibility === "public");
 
   function chatRow(chat: Chat & { snippet?: string | null }) {
     return (
       <div key={chat.id} className={`chat-list-item ${chat.id === activeChatId ? "active" : ""}`} onClick={() => onSelect(chat.id)}>
+        {/* Public: anyone can read it, like the faces say it's shared. */}
+        {chat.visibility === "public" && (
+          <span className="public-mark" title="Public: anyone on Lechuga can read this chat">
+            ◎
+          </span>
+        )}
         <span className="chat-title">{chat.title ?? "New chat"}</span>
         {chat.snippet && <span className="chat-snippet">{chat.snippet}</span>}
         {/* Shared: everyone in it, the owner ringed. */}
@@ -183,6 +195,7 @@ export function Sidebar({
           <span className="new-bot-plus">+</span> New bot
         </button>
       )}
+
       <div className="chat-list">
         {searching && hits !== null && hits.length === 0 && <p className="chat-list-empty">No chat has those words.</p>}
         {searching && (hits ?? []).map((chat) => chatRow(chat))}
@@ -193,6 +206,11 @@ export function Sidebar({
           groups.map(({ bot, chats: own }) => (
             <div key={bot.id} className="bot-group" style={{ borderLeftColor: colourFor(bot.id) }}>
               <div className="bot-row">
+                {bot.visibility === "public" && (
+                  <span className="public-mark" title="Public: anyone on Lechuga can chat with this bot, and every chat with it is public">
+                    ◎
+                  </span>
+                )}
                 <span className="bot-row-name">{bot.name}</span>
                 {/* Once shared: everyone with it, the owner ringed. */}
                 {bot.people && <AvatarStack people={bot.people} ownerId={bot.user_id} size={16} max={3} />}
@@ -268,6 +286,14 @@ export function Sidebar({
             {sharedWithMe.map((chat) => chatRow(chat))}
           </div>
         )}
+        {!searching && publicJoined.length > 0 && (
+          <div className="bot-group shared">
+            <div className="bot-row">
+              <span className="bot-row-name">Public chats I've joined</span>
+            </div>
+            {publicJoined.map((chat) => chatRow(chat))}
+          </div>
+        )}
       </div>
 
       {/* Dialogs go to document.body: the sidebar is transformed for its
@@ -279,7 +305,15 @@ export function Sidebar({
         createPortal(
           <div className="modal-backdrop" onClick={() => setShareBot(null)}>
             <div className="modal share-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-              <BotShare bot={shareBot} onPeople={(people) => onBotPeople(shareBot.id, people)} onClose={() => setShareBot(null)} />
+              <BotShare
+                bot={shareBot}
+                onPeople={(people) => onBotPeople(shareBot.id, people)}
+                onPublic={(bot) => {
+                  onBotUpdated(bot);
+                  setShareBot(bot);
+                }}
+                onClose={() => setShareBot(null)}
+              />
             </div>
           </div>,
           document.body
@@ -312,6 +346,13 @@ export function Sidebar({
             {/* Feedback, Getting started with AI and About Lechuga live on
                 the Help pages (linked from the footer too) instead of
                 crowding this menu. */}
+            {/* Everyone's public chats and bots, for browsing without a
+                query; the search box above finds them too. */}
+            {!me.seat && (
+              <Link to="/public" role="menuitem" onClick={() => setMenuOpen(false)}>
+                Public
+              </Link>
+            )}
             <Link to="/help" role="menuitem" onClick={() => setMenuOpen(false)}>
               Help
             </Link>

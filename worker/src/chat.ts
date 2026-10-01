@@ -4,6 +4,9 @@ import { systemPrompt } from "./prompt";
 import { loadMemory, parseRemembered, rememberRequest, rememberTool, saveMemory } from "./memory";
 import { botAccess, botFor, defaultBot } from "./bots";
 import { checkMessage, fixedReplyStream, guardReply, recordGuardEvent } from "./guard";
+import { firstAnswer, houseAccount, publicMessagesToday, publicSpendToday, relatedPublic } from "./public";
+
+const PUBLIC = config.public_chats;
 import { Hono } from "hono";
 import type { AppEnv, Env, BotRow, ChatRow, MessageRow } from "./types";
 import { streamChat, collectText, type ChatTurn } from "./gateway";
@@ -94,15 +97,19 @@ chat.get("/chats/search", async (c) => {
   const userId = c.get("userId");
   const like = (w: string) => `%${w.replace(/[\\%_]/g, (ch) => "\\" + ch)}%`;
   const clauses = words.map((_, i) => `lower(m.content) LIKE ?${i + 2} ESCAPE '\\'`).join(" AND ");
+  // Mine, the ones shared with me, and (unless I'm a username-and-code
+  // account) the public ones, which are everyone's to find.
+  const seat = c.get("seatOf") !== null;
   const { results: hits } = await c.env.DB.prepare(
     `SELECT m.chat_id, m.content FROM messages m
      WHERE m.chat_id IN (
        SELECT id FROM chats WHERE user_id = ?1
-       UNION SELECT chat_id FROM chat_members WHERE user_id = ?1 AND removed_at IS NULL)
+       UNION SELECT chat_id FROM chat_members WHERE user_id = ?1 AND removed_at IS NULL
+       UNION SELECT id FROM chats WHERE visibility = 'public' AND ?2 = 0)
      AND ${clauses}
      ORDER BY m.created_at DESC LIMIT 300`
   )
-    .bind(userId, ...words.map(like))
+    .bind(userId, seat ? 1 : 0, ...words.map(like))
     .all<{ chat_id: string; content: string }>();
 
   const snippetOf = new Map<string, string>();
@@ -120,7 +127,20 @@ chat.get("/chats/search", async (c) => {
   }
 
   const mine = await listChats(c.env, userId);
-  const matches = mine
+  const seen = new Set(mine.map((ch) => ch.id));
+  // Public chats that matched and aren't already in my list.
+  const extra = seat
+    ? []
+    : (
+        await c.env.DB.prepare(
+          `SELECT c.* FROM chats c WHERE c.visibility = 'public' AND (c.id IN (${[...snippetOf.keys()].map(() => "?").join(",") || "''"})
+           OR ${words.map((_, i) => `lower(c.title) LIKE ?${snippetOf.size + i + 1} ESCAPE '\\'`).join(" AND ")})
+           ORDER BY c.updated_at DESC LIMIT 50`
+        )
+          .bind(...snippetOf.keys(), ...words.map(like))
+          .all<ChatRow>()
+      ).results.filter((ch) => !seen.has(ch.id));
+  const matches = [...mine, ...extra]
     .filter((ch) => snippetOf.has(ch.id) || (ch.title && words.every((w) => ch.title!.toLowerCase().includes(w))))
     .slice(0, 50)
     .map((ch) => ({ ...ch, snippet: snippetOf.get(ch.id) ?? null }));
@@ -134,7 +154,7 @@ chat.get("/chats/search", async (c) => {
 chat.post("/chats", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const userId = c.get("userId");
-  const shared = typeof body?.bot === "string" ? (await botAccess(c.env, body.bot, userId))?.bot : null;
+  const shared = typeof body?.bot === "string" ? (await botAccess(c.env, body.bot, userId, c.get("seatOf") !== null))?.bot : null;
   // A seat has no Seed to fall back on: only a bot it's been let into.
   if (!shared && c.get("seatOf")) return c.json({ error: "this account can only chat with the bots shared with it" }, 403);
   const bot = shared || (await defaultBot(c.env, userId));
@@ -142,10 +162,11 @@ chat.post("/chats", async (c) => {
 
   const id = crypto.randomUUID();
   const now = Date.now();
+  // With a public bot, the chat is public from the start (public.ts).
   await c.env.DB.prepare(
-    "INSERT INTO chats (id, user_id, bot_id, title, model, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?)"
+    "INSERT INTO chats (id, user_id, bot_id, title, model, visibility, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)"
   )
-    .bind(id, userId, bot.id, model, now, now)
+    .bind(id, userId, bot.id, model, bot.visibility === "public" ? "public" : "private", now, now)
     .run();
   return c.json({ id, bot: bot.id });
 });
@@ -200,7 +221,7 @@ chat.post("/chats/import", async (c) => {
 // either way), so ids can't be probed.
 chat.get("/chats/:id", async (c) => {
   const chatId = c.req.param("id");
-  const access = await chatAccess(c.env, chatId, c.get("userId"));
+  const access = await chatAccess(c.env, chatId, c.get("userId"), c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
 
   const [{ results }, people, bot] = await Promise.all([
@@ -234,16 +255,16 @@ chat.delete("/chats/:id", async (c) => {
 chat.post("/chats/:id/messages", async (c) => {
   const chatId = c.req.param("id");
   const userId = c.get("userId");
-  const access = await chatAccess(c.env, chatId, userId);
+  const access = await chatAccess(c.env, chatId, userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   const chatRow = access.chat;
   const bot = await botFor(c.env, chatRow);
+  const isPublic = chatRow.visibility === "public";
   // Whoever typed, the bot's owner pays for the reply: the chat's own owner
   // in the usual case, and the bot's owner when someone chats with a bot
-  // shared with them. Named apart so a chat can one day be paid for by
-  // someone else again (a public chat, by Lechuga). mine: the payer is me,
-  // so an empty balance is mine to fill.
-  const payerId = bot.user_id;
+  // shared with them. In a public chat, the house account (public.ts).
+  // mine: the payer is me, so an empty balance is mine to fill.
+  const payerId = isPublic ? await houseAccount(c.env) : bot.user_id;
   const mine = payerId === userId;
 
   const body = await c.req.json().catch(() => null);
@@ -299,12 +320,24 @@ chat.post("/chats/:id/messages", async (c) => {
   if (recent.lastMinute >= LIMITS.messages_per_minute) {
     return c.json({ error: "that's a lot of messages in one minute. Give it a moment and try again." }, 429);
   }
-  if (recent.inFlight >= LIMITS.replies_in_flight) {
+  if (recent.inFlight >= (isPublic ? PUBLIC.replies_in_flight : LIMITS.replies_in_flight)) {
     return c.json({ error: "a few replies are still being written. Wait for one to finish, then send this again." }, 429);
+  }
+  // A public chat spends the house account's credits: its balance where
+  // credits are enforced, a daily cap for everyone's public chats together,
+  // and a daily cap per person.
+  if (isPublic) {
+    const [spent, sentToday] = await Promise.all([publicSpendToday(c.env, payerId), publicMessagesToday(c.env, userId)]);
+    if (spent >= PUBLIC.daily_cap_credits || (creditsEnforced(c.env) && account.balance <= 0)) {
+      return c.json({ error: "public chats have used up today's allowance. They're back tomorrow; your own chats aren't affected.", code: "public_paused" }, 402);
+    }
+    if (sentToday >= PUBLIC.per_person_per_day) {
+      return c.json({ error: `that's ${PUBLIC.per_person_per_day} messages in public chats today, which is the limit for one person. Your own chats aren't affected.` }, 429);
+    }
   }
   // The code field is what the UI turns into the buy prompt. Someone typing
   // in a chat that isn't theirs can't buy its owner credits, so no code.
-  if (creditsEnforced(c.env) && account.balance <= 0) {
+  if (!isPublic && creditsEnforced(c.env) && account.balance <= 0) {
     return mine
       ? c.json({ error: "you're out of lettuce", code: "out_of_credits" }, 402)
       : c.json({ error: "the person who started this chat is out of credits, so it's paused until they get more" }, 402);
@@ -316,6 +349,14 @@ chat.post("/chats/:id/messages", async (c) => {
       "INSERT INTO messages (id, chat_id, role, content, user_id, created_at) VALUES (?, ?, 'user', ?, ?, ?)"
     ).bind(crypto.randomUUID(), chatId, content, userId, now),
     c.env.DB.prepare("UPDATE chats SET updated_at = ? WHERE id = ?").bind(now, chatId),
+    // Typing in a public chat joins it: it's in your list from here on.
+    ...(isPublic && chatRow.user_id !== userId
+      ? [
+          c.env.DB.prepare(
+            "INSERT INTO chat_members (chat_id, user_id, added_by, added_at) VALUES (?1, ?2, ?2, ?3) ON CONFLICT(chat_id, user_id) DO UPDATE SET removed_at = NULL"
+          ).bind(chatId, userId, now),
+        ]
+      : []),
   ]);
 
   const { results: fullHistory } = await c.env.DB.prepare(
@@ -326,6 +367,11 @@ chat.post("/chats/:id/messages", async (c) => {
   // After a "compact this chat", only the summary and what came after it.
   const { kept: history, dropped } = trimHistory(sinceLastSummary(fullHistory));
   const names = await speakerNames(c.env, chatRow, bot);
+  // "Asked before" (public.ts): on a chat's first message, public chats
+  // that opened with the same words, as links, and the closest one's first
+  // answer handed to the model to lean on or point at.
+  const related = fullHistory.length === 1 ? await relatedPublic(c.env, content, chatId) : [];
+  const broughtIn = related.length > 0 ? await firstAnswer(c.env, related[0].id) : null;
 
   // A guarded bot (guard.ts): the message is checked before the bot sees
   // it. A hit gets a fixed reply instead of an answer, stored like one but
@@ -366,11 +412,21 @@ chat.post("/chats/:id/messages", async (c) => {
     : undefined;
   // A guarded bot has no tools: nothing from the web, nothing kept.
   const tools = bot.guarded ? [] : withMemory ? [...toolsFor(c.env), rememberTool(userId)] : toolsFor(c.env);
-  const reply = runReply(c.env, chatRow.model, forModel(history, names, { model: chatRow.model, toolNames: tools.map((t) => t.name), bot, notes: withMemory ? memory.notes : null, guarded: bot.guarded === 1 }), {
+  const turns = forModel(history, names, { model: chatRow.model, toolNames: tools.map((t) => t.name), bot, notes: withMemory ? memory.notes : null, guarded: bot.guarded === 1, isPublic });
+  if (broughtIn) {
+    turns.splice(turns.length - 1, 0, {
+      role: "system",
+      content:
+        `A public chat on Lechuga has already covered something close to this question: "${related[0].title ?? "untitled"}", at ${c.env.BASE_URL}/c/${related[0].id}. Its first answer began:\n\n${broughtIn}\n\n` +
+        "If that answers what's being asked, say so briefly, give the link, and add only what's different about this question. If it doesn't fit, ignore it and answer as usual.",
+    });
+  }
+  const reply = runReply(c.env, chatRow.model, turns, {
     maxTokens: LIMITS.max_reply_tokens,
     effort,
     tools,
     notice,
+    related,
   });
 
   c.header("content-type", "text/event-stream");
@@ -434,7 +490,7 @@ type Turn = { role: "user" | "assistant"; content: string; user_id: string | nul
 // bot's owner can see it and join in.
 async function speakerNames(env: Env, chatRow: ChatRow, bot: BotRow): Promise<Map<string, string> | null> {
   const { results } = await env.DB.prepare("SELECT user_id FROM chat_members WHERE chat_id = ?").bind(chatRow.id).all<{ user_id: string }>();
-  if (results.length === 0 && chatRow.user_id === bot.user_id) return null;
+  if (results.length === 0 && chatRow.user_id === bot.user_id && chatRow.visibility !== "public") return null;
   const people = await peopleByIds(env, [chatRow.user_id, bot.user_id, ...results.map((r) => r.user_id)]);
   const names = new Map([...people].map(([id, p]) => [id, p.name]));
   // Turns from before sharing have no user_id; they were the owner's.
@@ -449,7 +505,7 @@ async function speakerNames(env: Env, chatRow: ChatRow, bot: BotRow): Promise<Ma
 function forModel(
   history: Turn[],
   names: Map<string, string> | null,
-  opts: { model: string; toolNames?: string[]; bot: { name: string; soul: string }; notes?: string | null; guarded?: boolean }
+  opts: { model: string; toolNames?: string[]; bot: { name: string; soul: string }; notes?: string | null; guarded?: boolean; isPublic?: boolean }
 ): ChatTurn[] {
   const tagged = (m: Turn): string | ContentPart[] => {
     const content = modelContent(m.content);
@@ -464,7 +520,7 @@ function forModel(
         ? { role: "system", content: SUMMARY_PREAMBLE + summaryText(m.content) }
         : { role: "assistant", content: m.content }
   );
-  const system = systemPrompt({ model: opts.model, toolNames: opts.toolNames, bot: { name: opts.bot.name, soul: opts.bot.soul }, notes: opts.notes, shared: names !== null, guarded: opts.guarded });
+  const system = systemPrompt({ model: opts.model, toolNames: opts.toolNames, bot: { name: opts.bot.name, soul: opts.bot.soul }, notes: opts.notes, shared: names !== null, guarded: opts.guarded, isPublic: opts.isPublic });
   return [{ role: "system", content: system }, ...turns];
 }
 

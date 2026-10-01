@@ -10,6 +10,7 @@ import { avatars, me } from "./me";
 import { memory } from "./memory";
 import { bots } from "./bots";
 import { seats } from "./seats";
+import { publicChats } from "./public";
 import { nightly } from "./nightly";
 import { sharing } from "./sharing";
 import { billing } from "./billing";
@@ -98,6 +99,7 @@ app.use("/api/*", async (c, next) => {
     path.startsWith("/api/memory") ||
     path.startsWith("/api/admin") ||
     (path === "/api/bots" && method === "POST") ||
+    path.startsWith("/api/public") ||
     /^\/api\/chats\/[^/]+\/(members|pending|remember)/.test(path) ||
     /^\/api\/bots\/[^/]+\/(members|pending|seats)/.test(path);
   if (closed) return c.json({ error: "not available on this account" }, 403);
@@ -107,6 +109,7 @@ app.use("/api/*", async (c, next) => {
 app.route("/api/me", me);
 app.route("/api/memory", memory);
 app.route("/api/bots", seats);
+app.route("/api/public", publicChats);
 app.route("/api/bots", bots);
 app.route("/api/avatars", avatars);
 app.route("/api/invites", invites);

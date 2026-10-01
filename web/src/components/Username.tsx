@@ -56,15 +56,13 @@ export function Username({ onDone }: Props) {
   }
 
   return (
-    <div className="app landing">
-      <div className="chat-view">
-        <div className="hero">
-          <img className="hero-logo" src="/lechuga_logo.png" alt="" />
-          <h1 className="hero-title">
+    <div className="home">
+      <section className="home-hero">
+        <img className="hero-logo" src="/lechuga_logo.png" alt="" />
+        <h1 className="hero-title">
           Lechuga <span className="alpha" title="Early days: rough edges expected">alpha</span>
         </h1>
-          <p className="hero-tag">welcome. pick a name.</p>
-        </div>
+        <p className="hero-tag">welcome. pick a name.</p>
         <div className="signin">
           <form className="signin-form" onSubmit={submit}>
             <label className="signin-label" htmlFor="username">
@@ -101,7 +99,7 @@ export function Username({ onDone }: Props) {
             </div>
           </form>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
