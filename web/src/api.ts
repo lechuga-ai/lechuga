@@ -180,7 +180,7 @@ export type BotRoster = {
 // back once, here and from resetSeatCode; it's stored hashed.
 export async function createSeat(
   botId: string,
-  seat: { name: string; username: string; code?: string }
+  seat: { username: string; name?: string; code?: string }
 ): Promise<{ roster: BotRoster; seat: { id: string; username: string; name: string }; code: string }> {
   return expectJson(await postJson(`/api/bots/${botId}/seats`, seat));
 }

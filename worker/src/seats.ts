@@ -46,7 +46,8 @@ function cleanCode(raw: unknown): string | null {
 
 export const seats = new Hono<AppEnv>();
 
-// Make one, in the bot. Answers with the code, once: it's stored hashed.
+// Make one, in the bot, from a username. Answers with the code, once: it's
+// stored hashed.
 seats.post("/:id/seats", async (c) => {
   const userId = c.get("userId");
   if (c.get("seatOf")) return c.json({ error: "not found" }, 404);
@@ -56,8 +57,9 @@ seats.post("/:id/seats", async (c) => {
   const bot = access.bot;
 
   const body = await c.req.json().catch(() => ({}));
+  // The username is the name: they show as @username, like anyone who
+  // leaves the profile name empty. A name may still be given.
   const name = typeof body?.name === "string" ? body.name.replace(/\s+/g, " ").trim().slice(0, 60) : "";
-  if (!name) return c.json({ error: "give them a name" }, 400);
   const check = checkUsernameFormat(typeof body?.username === "string" ? body.username : "");
   if (!check.ok) return c.json({ error: check.reason }, 400);
   const code = cleanCode(body?.code);
