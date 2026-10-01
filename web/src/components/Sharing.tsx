@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { ApiError, type BotRoster, type Person, type Roster } from "../api";
+import { ApiError, sendPublicPointer, type BotRoster, type Person, type Roster } from "../api";
 import { Avatar } from "./Avatar";
 import { appLink, copyText, seatLink } from "../copy";
 import { SEAT_DOMAIN } from "../../../worker/src/seat-email";
@@ -63,6 +63,73 @@ export function SharingPanel({ target }: { target: SharingTarget }) {
 
   const shown = t.isPublic ? "everyone" : level;
   const path = t.kind === "chat" ? `/c/${t.id}` : `/b/${t.id}`;
+  // Once public: who to tell.
+  const [tell, setTell] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  async function sendPointer(e: FormEvent) {
+    e.preventDefault();
+    const entered = tell.trim();
+    if (!entered || busy) return;
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    try {
+      const r = await sendPublicPointer(t.kind, t.id, entered);
+      setNote(`Sent to ${r.sentTo}.`);
+      setTell("");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (t.isPublic) {
+    return (
+      <div className="sharing">
+        <p className="sharing-public-lead">
+          {t.kind === "chat"
+            ? "This chat is public: anyone on Lechuga can read it and join in, and the replies are on Lechuga."
+            : `${t.name} is public: anyone on Lechuga can chat with it, every chat with it is public, and the replies are on Lechuga.`}
+        </p>
+        <div className="sharing-link">
+          <code>{appLink(path)}</code>
+          <button
+            type="button"
+            className="primary"
+            onClick={() =>
+              void copyText(appLink(path)).then(() => {
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1800);
+              })
+            }
+          >
+            {copied ? "copied" : "copy"}
+          </button>
+        </div>
+        <form onSubmit={sendPointer} className="sharing-add sharing-tell">
+          <span className="sharing-tell-label">Tell someone:</span>
+          <input
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="@username or email"
+            value={tell}
+            onChange={(e) => setTell(e.target.value)}
+            disabled={busy}
+            aria-label="Username or email"
+          />
+          <button type="submit" className="primary" disabled={busy || !tell.trim()}>
+            {busy ? "…" : "send"}
+          </button>
+        </form>
+        <p className="sharing-why">They get an email with the link. Nothing else changes: public is everyone's already.</p>
+        {note && <p className="modal-ok">{note}</p>}
+        {error && <p className="modal-error">{error}</p>}
+      </div>
+    );
+  }
 
   async function run<T extends { roster?: AnyRoster; waitingFor?: string }>(action: () => Promise<T>, done?: string): Promise<T | null> {
     setBusy(true);
@@ -384,13 +451,6 @@ export function SharingPanel({ target }: { target: SharingTarget }) {
           <div className="sharing-people">
             <button type="button" className="primary" onClick={() => void goPublic()} disabled={busy}>
               {busy ? "…" : `Make ${t.kind === "chat" ? "this chat" : t.name} public`}
-            </button>
-          </div>
-        )}
-        {t.isPublic && (
-          <div className="sharing-people">
-            <button type="button" className="signin-link" onClick={() => void copyText(appLink(path))}>
-              copy the link
             </button>
           </div>
         )}

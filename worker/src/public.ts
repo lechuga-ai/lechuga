@@ -1,8 +1,11 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import type { AppEnv, ChatRow, Env } from "./types";
 import { chatAccess, peopleByIds, type Person } from "./sharing";
 import { botAccess, botFor, type BotView } from "./bots";
 import { splitMessage } from "./attachments";
+import { normalizeEmail } from "./invites";
+import { sendEmail } from "./email";
+import { publicPointerEmail } from "./email/templates";
 import config from "../config.json";
 
 // Public chats (migration 0017; the visibility column is from 0003). The
@@ -226,6 +229,46 @@ publicChats.get("/chats", async (c) => {
     snippet: snippetOf.get(r.id) ?? null,
   }));
   return c.json(out);
+});
+
+// Point someone at a public chat or bot: an email with the link, from
+// whoever owns the thing. Nothing else happens; public is everyone's. The
+// person needs an account already (Lechuga is invite only), so a username
+// or an address that has one.
+async function pointer(c: Context<AppEnv>, what: "chat" | "bot", title: string, url: string, ownerId: string) {
+  const userId = c.get("userId");
+  if (ownerId !== userId) return c.json({ error: `only the ${what}'s owner can send it on` }, 403);
+  const body = await c.req.json().catch(() => ({}));
+  const who = typeof body?.who === "string" ? body.who.trim().replace(/^@/, "") : "";
+  if (!who) return c.json({ error: "enter a username or an email address" }, 400);
+  let target: { id: string; email: string } | null;
+  if (who.includes("@")) {
+    const email = normalizeEmail(who);
+    if (!email) return c.json({ error: "that doesn't look like an email address" }, 400);
+    target = await c.env.DB.prepare("SELECT id, email FROM user WHERE lower(email) = ? AND seat_of IS NULL").bind(email).first<{ id: string; email: string }>();
+    if (!target) return c.json({ error: "that address doesn't have a Lechuga account yet; invite them first, from the menu behind your name" }, 404);
+  } else {
+    target = await c.env.DB.prepare("SELECT id, email FROM user WHERE lower(username) = ? AND seat_of IS NULL").bind(who.toLowerCase()).first<{ id: string; email: string }>();
+    if (!target) return c.json({ error: `nobody here goes by @${who}` }, 404);
+  }
+  if (target.id === userId) return c.json({ error: "that's you" }, 400);
+  const sharerName = c.get("username") ? `@${c.get("username")}` : c.get("userName") || "Someone";
+  c.executionCtx.waitUntil(
+    sendEmail(c.env, { to: target.email, ...publicPointerEmail({ sharerName, what, title, url }) }).catch((err) => console.error("pointer email failed", err))
+  );
+  return c.json({ ok: true, sentTo: who });
+}
+
+publicChats.post("/chats/:id/invite", async (c) => {
+  const access = await chatAccess(c.env, c.req.param("id"), c.get("userId"), c.get("seatOf") !== null);
+  if (!access || access.chat.visibility !== "public") return c.json({ error: "not found" }, 404);
+  return pointer(c, "chat", access.chat.title ?? "untitled", `${c.env.BASE_URL}/c/${access.chat.id}`, access.chat.user_id);
+});
+
+publicChats.post("/bots/:id/invite", async (c) => {
+  const access = await botAccess(c.env, c.req.param("id"), c.get("userId"), c.get("seatOf") !== null);
+  if (!access || access.bot.visibility !== "public") return c.json({ error: "not found" }, 404);
+  return pointer(c, "bot", access.bot.name, `${c.env.BASE_URL}/b/${access.bot.id}`, access.bot.user_id);
 });
 
 // Make a chat public. The owner's call, on a chat with their own bot, not a

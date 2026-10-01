@@ -4129,16 +4129,31 @@ button {
   gap: 4px;
 }
 
-.sharing-level {
+/* Named with the modal and the settings page in front, so their own label
+   and input rules (block, full width) don't pull the button onto its own
+   line. */
+.modal .sharing-level,
+.doc-inner .sharing-level {
   display: flex;
+  flex-direction: row;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
+  margin: 0;
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 12px;
   cursor: pointer;
   font-size: 14px;
   line-height: 1.4;
+}
+
+.modal .sharing-level input[type="radio"],
+.doc-inner .sharing-level input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin: 3px 0 0;
+  accent-color: #6fae3b;
 }
 
 .sharing-level.on {
@@ -4149,11 +4164,6 @@ button {
 .sharing-level.off {
   opacity: 0.6;
   cursor: default;
-}
-
-.sharing-level input {
-  width: auto;
-  margin-top: 3px;
 }
 
 .sharing-level > span {
@@ -4199,6 +4209,43 @@ button {
 
 .sharing-sub {
   margin-top: 10px;
+}
+
+/* Once public: the link, and "tell someone". */
+.modal p.sharing-public-lead,
+.doc-inner .settings-panel p.sharing-public-lead {
+  margin: 0 0 12px;
+  font-size: 13.5px;
+}
+
+.sharing-link {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.sharing-link code {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #f6f8f3;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sharing-tell-label {
+  font-size: 13.5px;
+  color: var(--box-text);
+}
+
+.sharing-tell + .sharing-why {
+  display: block;
+  margin-top: 6px;
 }
 
 .modal .sharing-sub p,
