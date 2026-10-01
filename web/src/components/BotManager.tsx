@@ -215,7 +215,8 @@ function BotPanel({ bot, models, highlighted, onSaved, onDeleted, onPeople }: Pa
 // Who else has the bot. The owner adds people by username or email and
 // takes them out again; what sharing a bot means is spelled out, since it's
 // their credits and they'll be reading.
-export function BotShare({ bot, onPeople }: { bot: Bot; onPeople: (people: Person[] | undefined) => void }) {
+// onClose: the panel is a dialog, so the share screen ends in a Done.
+export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (people: Person[] | undefined) => void; onClose?: () => void }) {
   const [roster, setRoster] = useState<BotRoster | null>(null);
   const [who, setWho] = useState("");
   const [busy, setBusy] = useState(false);
@@ -459,10 +460,10 @@ export function BotShare({ bot, onPeople }: { bot: Bot; onPeople: (people: Perso
                   if (p.seat) {
                     if (
                       window.confirm(
-                        `Remove ${p.name}? This account exists only for ${bot.name}, so removing it deletes it for good: they can't sign in again, and the username is freed. Their chats with ${bot.name} stay with you.`
+                        `Remove ${p.name}? They're signed out and can't sign in again. Their chats with ${bot.name} stay with you, and the username stays theirs: you can bring them back from this list, with a new code.`
                       )
                     ) {
-                      void run(() => deleteSeat(bot.id, p.id), `${p.name} is gone.`);
+                      void run(() => deleteSeat(bot.id, p.id), `${p.name} is signed out and out of ${bot.name}.`);
                     }
                   } else {
                     void run(() => removeBotMember(bot.id, p.id), `${p.name} no longer has this bot. Their chats with it stay with you.`);
@@ -490,9 +491,41 @@ export function BotShare({ bot, onPeople }: { bot: Bot; onPeople: (people: Perso
               <Avatar person={p} size={28} />
               <span className="share-name">{p.name}</span>
               <span className="share-state">removed</span>
+              {/* A seat comes back with a new code; it has no email to be
+                  told by, so the code screen follows at once. */}
+              {p.seat && p.username && (
+                <button
+                  type="button"
+                  className="signin-link"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(() => addBotMember(bot.id, p.username!)).then(async (ok) => {
+                      if (!ok) return;
+                      setBusy(true);
+                      try {
+                        setHandOver(await resetSeatCode(bot.id, p.id));
+                        setMode("code");
+                      } catch (err) {
+                        setError((err as Error).message);
+                      } finally {
+                        setBusy(false);
+                      }
+                    })
+                  }
+                >
+                  bring back
+                </button>
+              )}
             </li>
           ))}
         </ul>
+      )}
+      {onClose && (
+        <div className="modal-actions">
+          <button type="button" onClick={onClose} disabled={busy}>
+            Done
+          </button>
+        </div>
       )}
     </div>
   );

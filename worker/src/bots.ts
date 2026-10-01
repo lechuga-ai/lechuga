@@ -328,9 +328,12 @@ bots.post("/:id/members", async (c) => {
     ? c.env.DB.prepare("UPDATE bot_members SET removed_at = NULL, added_at = ?, added_by = ? WHERE bot_id = ? AND user_id = ?").bind(now, userId, bot.id, target.id)
     : c.env.DB.prepare("INSERT INTO bot_members (bot_id, user_id, added_by, added_at) VALUES (?, ?, ?, ?)").bind(bot.id, target.id, userId, now)
   ).run();
-  c.executionCtx.waitUntil(
-    sendEmail(c.env, { to: target.email, ...botSharedEmail({ sharerName, botName: bot.name, url: `${c.env.BASE_URL}/` }) }).catch((err) => console.error("bot share email failed", err))
-  );
+  // A seat's address gets no mail; its owner hands over the news in person.
+  if (!seat?.seat_of) {
+    c.executionCtx.waitUntil(
+      sendEmail(c.env, { to: target.email, ...botSharedEmail({ sharerName, botName: bot.name, url: `${c.env.BASE_URL}/` }) }).catch((err) => console.error("bot share email failed", err))
+    );
+  }
   return c.json({ roster: await botRoster(c.env, bot, true) });
 });
 

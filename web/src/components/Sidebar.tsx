@@ -268,12 +268,7 @@ export function Sidebar({
         createPortal(
           <div className="modal-backdrop" onClick={() => setShareBot(null)}>
             <div className="modal share-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-              <BotShare bot={shareBot} onPeople={(people) => onBotPeople(shareBot.id, people)} />
-              <div className="modal-actions">
-                <button type="button" onClick={() => setShareBot(null)}>
-                  Done
-                </button>
-              </div>
+              <BotShare bot={shareBot} onPeople={(people) => onBotPeople(shareBot.id, people)} onClose={() => setShareBot(null)} />
             </div>
           </div>,
           document.body

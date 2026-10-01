@@ -113,14 +113,22 @@ seats.post("/:id/seats/:userId/code", async (c) => {
   return c.json({ username: seat.username, code });
 });
 
-// Gone: the account, its sessions, its place in the bot. Its chats stay
-// with the owner, who could always see them.
+// Removed, not deleted: signed out everywhere, its code wiped, out of the
+// bot, but the account stays, dormant, so the username stays its own and
+// its chats keep their name. The owner brings it back by adding the
+// username to a bot again (bots.ts) and handing out a new code.
 seats.delete("/:id/seats/:userId", async (c) => {
   const userId = c.get("userId");
   const access = await botAccess(c.env, c.req.param("id"), userId);
   if (!access || access.role !== "owner") return c.json({ error: "not found" }, 404);
   const seatId = c.req.param("userId");
-  const gone = await c.env.DB.prepare("DELETE FROM user WHERE id = ? AND seat_of = ?").bind(seatId, userId).run();
-  if (!gone.meta.changes) return c.json({ error: "not found" }, 404);
+  const seat = await c.env.DB.prepare("SELECT 1 AS one FROM user WHERE id = ? AND seat_of = ?").bind(seatId, userId).first();
+  if (!seat) return c.json({ error: "not found" }, 404);
+  const nowIso = new Date().toISOString();
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE bot_members SET removed_at = ? WHERE bot_id = ? AND user_id = ? AND removed_at IS NULL").bind(Date.now(), access.bot.id, seatId),
+    c.env.DB.prepare("UPDATE account SET password = NULL, updatedAt = ? WHERE userId = ? AND providerId = 'credential'").bind(nowIso, seatId),
+    c.env.DB.prepare("DELETE FROM session WHERE userId = ?").bind(seatId),
+  ]);
   return c.json({ roster: await botRoster(c.env, access.bot, true) });
 });
