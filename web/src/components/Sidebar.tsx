@@ -125,8 +125,11 @@ export function Sidebar({
   // Never lose a chat: one whose bot isn't in the list (the bots didn't
   // load, or a row points somewhere odd) still shows, under a plain heading.
   const orphans = chats.filter((c) => c.user_id === me.id && botOf(c) === null);
-  // Chats others started and let me into, one at a time.
-  const sharedWithMe = chats.filter((c) => c.user_id !== me.id && !bots.some((b) => inGroup(c, b)));
+  // Chats others started and let me into, one at a time; and the public
+  // ones I've joined, apart.
+  const notMine = chats.filter((c) => c.user_id !== me.id && !bots.some((b) => inGroup(c, b)));
+  const sharedWithMe = notMine.filter((c) => c.visibility !== "public");
+  const publicJoined = notMine.filter((c) => c.visibility === "public");
 
   function chatRow(chat: Chat & { snippet?: string | null }) {
     return (
@@ -182,6 +185,12 @@ export function Sidebar({
         <button type="button" className="new-bot-btn" onClick={() => openDialog("newBot")}>
           <span className="new-bot-plus">+</span> New bot
         </button>
+      )}
+      {/* Everyone's open chats, on their own page. Not for a username-and-code account. */}
+      {!me.seat && (
+        <Link to="/public" className="public-link">
+          <span className="new-bot-plus">◎</span> Public chats
+        </Link>
       )}
       <div className="chat-list">
         {searching && hits !== null && hits.length === 0 && <p className="chat-list-empty">No chat has those words.</p>}
@@ -266,6 +275,14 @@ export function Sidebar({
               <span className="bot-row-name">Shared with me</span>
             </div>
             {sharedWithMe.map((chat) => chatRow(chat))}
+          </div>
+        )}
+        {!searching && publicJoined.length > 0 && (
+          <div className="bot-group shared">
+            <div className="bot-row">
+              <span className="bot-row-name">Public chats I've joined</span>
+            </div>
+            {publicJoined.map((chat) => chatRow(chat))}
           </div>
         )}
       </div>

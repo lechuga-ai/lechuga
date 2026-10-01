@@ -1,20 +1,24 @@
 import { useState, type FormEvent } from "react";
 import { ApiError, addChatMember, cancelPendingShare, removeChatMember, type Roster } from "../api";
 import { Avatar } from "./Avatar";
-import { copyText, seatLink } from "../copy";
+import { appLink, copyText, seatLink } from "../copy";
 
 type Props = {
   chatId: string;
   roster: Roster;
   // The dialog shows whatever roster the server last sent back.
   onRoster: (roster: Roster) => void;
+  // Making the chat public (worker/src/public.ts), when that's allowed here.
+  canPublic?: boolean;
+  onPublic?: () => Promise<void>;
+  isPublic?: boolean;
   onClose: () => void;
 };
 
 // The owner's view of who's in a chat: add people by username or email, take
 // them out again. What sharing means is spelled out every time, since it's
 // their words and their credits.
-export function ShareDialog({ chatId, roster, onRoster, onClose }: Props) {
+export function ShareDialog({ chatId, roster, onRoster, canPublic = false, onPublic, isPublic = false, onClose }: Props) {
   const [who, setWho] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,10 +63,37 @@ export function ShareDialog({ chatId, roster, onRoster, onClose }: Props) {
   const active = roster.members.filter((m) => !m.removed);
   const removed = roster.members.filter((m) => m.removed);
 
+  async function goPublic() {
+    if (!onPublic || busy) return;
+    if (
+      !window.confirm(
+        "Make this chat public? Anyone on Lechuga will be able to read all of it, from the first message, and join in. Your name is on it. The replies will come out of Lechuga's credits, not yours. This can't be undone, though you can still delete the chat."
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    try {
+      await onPublic();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="modal-backdrop" onClick={() => !busy && onClose()}>
       <div className="modal share-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <h2>Share this chat</h2>
+        <h2>{isPublic ? "This chat is public" : "Share this chat"}</h2>
+        {isPublic && (
+          <p className="share-public-note">
+            Anyone on Lechuga can read it and join in; the replies are on Lechuga. Give people the link:{" "}
+            <button type="button" className="signin-link" onClick={() => void copyText(appLink(`/c/${chatId}`))}>
+              copy
+            </button>
+          </p>
+        )}
         <ul className="share-terms">
           <li>
             <strong>They see all of it.</strong> The whole chat from the very first message, files and pictures included.
@@ -171,6 +202,17 @@ export function ShareDialog({ chatId, roster, onRoster, onClose }: Props) {
           ))}
         </ul>
 
+        {canPublic && !isPublic && (
+          <div className="share-public">
+            <p>
+              <strong>Or make it public.</strong> Everyone on Lechuga can read it and join in, it shows on the public chats page, and the replies
+              come out of Lechuga's credits instead of yours. It can't be made private again.
+            </p>
+            <button type="button" className="signin-link" onClick={goPublic} disabled={busy}>
+              make this chat public
+            </button>
+          </div>
+        )}
         <div className="modal-actions">
           <button type="button" onClick={onClose} disabled={busy}>
             Done

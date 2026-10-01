@@ -19,6 +19,8 @@ export type Chat = {
   user_id: string;
   // The bot it's with (null only on a chat from before bots: the owner's Seed).
   bot_id: string | null;
+  // 'public': anyone signed in can read and join it; Lechuga pays.
+  visibility: "private" | "public";
   title: string | null;
   model: string;
   created_at: number;
@@ -200,6 +202,18 @@ export async function deleteSeat(botId: string, userId: string): Promise<{ roste
   return expectJson(await apiFetch(`/api/bots/${botId}/seats/${userId}`, { method: "DELETE" }));
 }
 
+// Public chats (worker/src/public.ts): the browse page's list, and making
+// one of mine public, which is for keeps.
+export type PublicChatSummary = { id: string; title: string | null; owner: Person; updated_at: number; messages: number; snippet?: string | null };
+
+export async function listPublicChats(q = ""): Promise<PublicChatSummary[]> {
+  return expectJson(await apiFetch(`/api/public/chats${q ? `?q=${encodeURIComponent(q)}` : ""}`));
+}
+
+export async function makeChatPublic(chatId: string): Promise<void> {
+  await expectJson(await apiFetch(`/api/public/chats/${chatId}/public`, { method: "POST" }));
+}
+
 export async function listBots(): Promise<Bot[]> {
   return expectJson(await apiFetch("/api/bots"));
 }
@@ -271,10 +285,12 @@ export type StreamHandlers = {
   // Something the server wants said alongside the reply (the chat was too
   // long to send whole).
   onNotice?: (text: string) => void;
+  // Public chats that opened with the same words as this chat's first message.
+  onRelated?: (related: { id: string; title: string | null }[]) => void;
   signal?: AbortSignal;
 };
 
-type StreamEvent = { delta?: string; reasoning?: string; notice?: string; error?: string; step?: Step; retract?: boolean };
+type StreamEvent = { delta?: string; reasoning?: string; notice?: string; error?: string; step?: Step; retract?: boolean; related?: { id: string; title: string | null }[] };
 
 // Streams the assistant's reply. Resolves when the stream ends, or quietly
 // when aborted via signal (the server still finishes and stores the reply).
@@ -283,7 +299,7 @@ export async function sendMessage(
   chatId: string,
   content: string,
   attachments: Attachment[],
-  { onDelta, onReasoning, onNotice, onStep, onRetract, signal }: StreamHandlers
+  { onDelta, onReasoning, onNotice, onStep, onRetract, onRelated, signal }: StreamHandlers
 ): Promise<void> {
   let res: Response;
   try {
@@ -297,10 +313,10 @@ export async function sendMessage(
     if ((err as Error).name === "AbortError") return;
     throw err;
   }
-  await readReplyStream(res, { onDelta, onReasoning, onNotice, onStep, onRetract });
+  await readReplyStream(res, { onDelta, onReasoning, onNotice, onStep, onRetract, onRelated });
 }
 
-async function readReplyStream(res: Response, { onDelta, onReasoning, onNotice, onStep, onRetract }: StreamHandlers): Promise<void> {
+async function readReplyStream(res: Response, { onDelta, onReasoning, onNotice, onStep, onRetract, onRelated }: StreamHandlers): Promise<void> {
   if (!res.ok || !res.body) {
     await expectJson(res);
     return;
@@ -309,6 +325,7 @@ async function readReplyStream(res: Response, { onDelta, onReasoning, onNotice, 
     for await (const event of parseSSE<StreamEvent>(res.body)) {
       if (event.error) throw new Error(event.error);
       if (event.notice) onNotice?.(event.notice);
+      if (event.related) onRelated?.(event.related);
       if (event.reasoning) onReasoning?.(event.reasoning);
       if (event.step) onStep?.(event.step);
       if (event.retract) onRetract?.();

@@ -25,17 +25,21 @@ export type Roster = {
 export type ChatRole = "owner" | "member";
 
 // A chat that exists but isn't yours looks identical to one that doesn't
-// exist (null either way), so ids can't be probed. Three ways in: it's
-// mine, I've been added to it, or it's with a bot I own (bots.ts): the
-// owner of a shared bot sees every chat with it, pays for them, and can do
-// everything its starter can.
-export async function chatAccess(env: Env, chatId: string, userId: string): Promise<{ chat: ChatRow; role: ChatRole } | null> {
+// exist (null either way), so ids can't be probed. Four ways in: it's
+// mine, I've been added to it, it's with a bot I own (bots.ts: the owner of
+// a shared bot sees every chat with it, pays for them, and can do
+// everything its starter can), or it's public (public.ts: anyone signed in
+// may read and join).
+// seat: the caller is a username-and-code account (seats.ts), which keeps
+// to the bots it was given: no public chats.
+export async function chatAccess(env: Env, chatId: string, userId: string, seat = false): Promise<{ chat: ChatRow; role: ChatRole } | null> {
   const chat = await env.DB.prepare(
     `SELECT c.* FROM chats c WHERE c.id = ?1 AND (c.user_id = ?2
+       OR (c.visibility = 'public' AND ?3 = 0)
        OR EXISTS (SELECT 1 FROM chat_members m WHERE m.chat_id = c.id AND m.user_id = ?2 AND m.removed_at IS NULL)
        OR EXISTS (SELECT 1 FROM bots b WHERE b.id = c.bot_id AND b.user_id = ?2))`
   )
-    .bind(chatId, userId)
+    .bind(chatId, userId, seat ? 1 : 0)
     .first<ChatRow>();
   if (!chat) return null;
   if (chat.user_id === userId) return { chat, role: "owner" };

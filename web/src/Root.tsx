@@ -4,6 +4,7 @@ import App from "./App";
 import { Visitor } from "./Visitor";
 import { Username } from "./components/Username";
 import { AcceptTerms } from "./components/AcceptTerms";
+import { PublicPage } from "./routes/PublicPage";
 import { Admin } from "./components/Admin";
 import { Legal } from "./components/Legal";
 import { WhatsNewPage } from "./routes/StaticPages";
@@ -86,6 +87,7 @@ export default function Root() {
       <Route path="/settings/credits" element={<SettingsPage me={me} onMeChange={setMe} />} />
       <Route path="/settings/memory" element={<SettingsPage me={me} onMeChange={setMe} />} />
       <Route path="/settings/bots" element={<SettingsPage me={me} onMeChange={setMe} />} />
+      <Route path="/public" element={me.seat ? <Navigate to="/" replace /> : <PublicPage />} />
       <Route path="/admin" element={me.isAdmin ? <Admin me={me} /> : <Navigate to="/" replace />} />
       {/* Where credits lived before Settings, and where older Stripe sessions
           send people back to. The query string (?checkout=success) rides

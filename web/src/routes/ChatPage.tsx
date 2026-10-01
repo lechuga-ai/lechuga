@@ -5,7 +5,7 @@ import { MessageList } from "../components/MessageList";
 import { Composer } from "../components/Composer";
 import { AvatarStack } from "../components/Avatar";
 import { ShareDialog } from "../components/ShareDialog";
-import { ApiError, compactChat, getChat, rememberChat, sendMessage, type Me, type Message, type Model, type Person, type Roster, type Step } from "../api";
+import { ApiError, compactChat, getChat, makeChatPublic, rememberChat, sendMessage, type Me, type Message, type Model, type Person, type Roster, type Step } from "../api";
 import { takeStartMessage } from "../startMessage";
 import { appLink, copyText } from "../copy";
 import { composeMessage, estimateMessageTokens, type Attachment } from "../../../worker/src/attachments";
@@ -38,6 +38,10 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   const [botName, setBotName] = useState(expectedBotName);
   // Set when the chat is with someone else's bot: they can see it.
   const [botOwner, setBotOwner] = useState<Person | null>(null);
+  // Public: anyone can read and join; Lechuga pays. Set from the chat row.
+  const [isPublic, setIsPublic] = useState(false);
+  // "Asked before": public chats that opened with this chat's first words.
+  const [related, setRelated] = useState<{ id: string; title: string | null }[]>([]);
   const [streamingText, setStreamingText] = useState<string | null>(null);
   const [streamingReasoning, setStreamingReasoning] = useState("");
   const [streamingSteps, setStreamingSteps] = useState<Step[]>([]);
@@ -85,6 +89,7 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
         setChatModel(chat.model);
         setBotName(bot.name);
         setBotOwner(bot.owner);
+        setIsPublic(chat.visibility === "public");
         setMessages(history);
         setRole(myRole);
         setRoster(people);
@@ -145,6 +150,7 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
           setStreamingText("");
         },
         onNotice: setNotice,
+        onRelated: setRelated,
       });
     } catch (err) {
       failure = (err as Error).message || "something went wrong";
@@ -261,13 +267,13 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   // Compacting spends the payer's credits, so it's only offered to them: in
   // someone else's bot the payer is its owner, so not there.
   const offerCompact =
-    role === "owner" && !botOwner && carried >= config.limits.compact_offer_tokens && streamingText === null && sinceLastSummary(messages).length >= 3;
+    role === "owner" && !botOwner && !isPublic && carried >= config.limits.compact_offer_tokens && streamingText === null && sinceLastSummary(messages).length >= 3;
 
   // Remember: Lechuga folds this chat into what it keeps about you (Account >
   // Memory). Only in a chat nobody else has ever been in, since the memory
   // is yours alone; the server holds the same line. Costs about a message.
   const canRemember =
-    role === "owner" && !isShared && !botOwner && (roster?.members.length ?? 0) === 0 && messages.length >= 2 && streamingText === null && !compacting;
+    role === "owner" && !isShared && !botOwner && !isPublic && (roster?.members.length ?? 0) === 0 && messages.length >= 2 && streamingText === null && !compacting;
 
   async function remember() {
     setRemembering(true);
@@ -308,6 +314,16 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
               setRoster(r);
               void refreshChats();
             }}
+            // Public is for a chat with your own bot, and not a guarded one;
+            // the worker checks too. botOwner set means the bot is someone
+            // else's.
+            canPublic={!botOwner && !me.seat}
+            onPublic={async () => {
+              await makeChatPublic(chatId);
+              setIsPublic(true);
+              setSharing(false);
+              void refreshChats();
+            }}
             onClose={() => setSharing(false)}
           />,
           document.body
@@ -322,6 +338,25 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
         ownerId={owner.id}
         meId={me.id}
       />
+      {isPublic && (
+        <p className="chat-notice chat-bot-note">
+          This chat is public: anyone on Lechuga can read it and join in. Everyone sees who said what. The replies are on Lechuga, not on anyone here.
+        </p>
+      )}
+      {related.length > 0 && (
+        <p className="chat-notice chat-related">
+          Asked before, in public:{" "}
+          {related.map((r, i) => (
+            <span key={r.id}>
+              {i > 0 && ", "}
+              <a href={`/c/${r.id}`} target="_blank" rel="noopener">
+                {r.title ?? "untitled"}
+              </a>
+            </span>
+          ))}
+          . The bot has seen the first of them.
+        </p>
+      )}
       {botOwner && (
         <p className="chat-notice chat-bot-note">
           {botName} is {botOwner.name}'s bot. {botOwner.name} can read this chat and join in, and its replies come out of their credits.
@@ -367,9 +402,10 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
               {isShared && <AvatarStack people={[owner, ...active]} ownerId={owner.id} size={22} max={4} />}
               {role === "owner" && (
                 <button type="button" className="composer-share-btn" onClick={() => setSharing(true)}>
-                  {isShared ? "Sharing" : "Share"}
+                  {isPublic ? "Public" : isShared ? "Sharing" : "Share"}
                 </button>
               )}
+              {role !== "owner" && isPublic && <span className="composer-public-tag">Public</span>}
               {/* The chat's address, for anyone already in it. */}
               <button
                 type="button"

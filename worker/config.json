@@ -80,6 +80,14 @@
     "min_turns": 2,
     "concurrency": 3
   },
+  "public_chats": {
+    "_comment": "Public chats (worker/src/public.ts) are paid for by the house account @lechuga. daily_cap_credits is the most they may spend together per UTC day; replies_in_flight is how many public replies may be unfinished at once across everyone; per_person_per_day caps one account's messages in public chats. related_max is how many 'asked before' links a first message may get, and bring_in_chars how much of the closest one's answer the model is handed.",
+    "daily_cap_credits": 200000,
+    "replies_in_flight": 20,
+    "per_person_per_day": 30,
+    "related_max": 3,
+    "bring_in_chars": 1500
+  },
   "stripe_managed_payments": true,
   "costs": {
     "markup": 2,
