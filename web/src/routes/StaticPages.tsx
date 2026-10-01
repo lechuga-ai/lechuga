@@ -85,28 +85,40 @@ type NewsEntry = { date: string; title: string; intro: string; items: { lead: st
 const NEWS: NewsEntry[] = [
   {
     date: "October 1, 2026",
-    title: "Public chats and bots",
+    title: "Sharing: one setting, three choices",
     intro:
-      "A chat or a bot of yours can now be opened to everyone on Lechuga: anyone can read it and join in, and the replies are on us. Public is a property of the thing, like shared, and it's marked with a ◎ where the thing is. And when a question has been answered in public before, you're told.",
+      "Who can see a chat or a bot is one setting now, the same for both: only you, people you choose, or everyone on Lechuga. The third one is new, and so is the way the other two work.",
     items: [
       {
-        lead: "Make a chat public.",
-        text: "Share, then Everyone on Lechuga. Sharing is a setting with three levels now, the same for a chat and a bot: only me, people I choose, everyone. Everyone on Lechuga can then read all of it and join in, and the replies come out of Lechuga's credits instead of yours. Your name is on it. You can make it private again from the same place; people who joined it then lose sight of it. Only a chat with your own bot, and not a guarded one.",
+        lead: "One setting.",
+        text: "Share, on a chat or in a bot's dots, opens the same panel either way: three choices, each with a line saying what it means and who it affects. Nothing changes until you press Done, which asks once with the rules spelled out, and anything that takes access away asks first too. Faces beside a chat or a bot mean it's shared; a ◎ means it's public.",
       },
       {
-        lead: "Make a bot public.",
-        text: "Share…, then Everyone on Lechuga. Anyone can then find it and chat with it, and everything in it is public: the chats you've had with it so far, and every chat anyone has with it from then on. Its replies are on Lechuga from then on. Not a guarded bot, and not one you've shared with people, since that would publish their chats. It can be made private again; people who started chats with it keep those, as people you've shared it with.",
+        lead: "People you choose.",
+        text: "Add them by username or email. In a chat, they read all of it and can keep it going; in a bot, they get their own chats with it, which you can read. You pay either way. The list under the choice shows who has it, with remove beside each.",
       },
       {
-        lead: "Finding them.",
-        text: "The search box on the left finds public chats along with your own; public ones carry the ◎. For browsing without a question, Public in the menu behind your name lists every public bot and chat, newest first. A public chat you've typed in joins your list under Public chats I've joined; a public bot you've chatted with joins your bots.",
+        lead: "Someone without an email, from a chat too.",
+        text: "Under People you choose: make them a username and a code. It's an account of its own, for that bot and (if you made it from a chat) that chat only. Beside each one: a link that signs them in, a new code, and full account, which gives it an email address and makes it theirs for good. Remove deletes it, and says so.",
+      },
+      {
+        lead: "Everyone on Lechuga.",
+        text: "Public. Anyone signed in can read the chat and join in, or chat with the bot, and the replies come out of Lechuga's credits rather than yours. Your name is on it. A public bot makes every chat with it public, the ones so far included. Not a guarded bot, and not a bot you've shared with people. Choose Only me or People you choose later and it's private again; people who joined lose sight of it.",
+      },
+      {
+        lead: "Finding what's public.",
+        text: "The search box on the left finds public chats along with yours. Public, in the menu behind your name, lists every public bot and chat, newest first. A public chat you've typed in joins your list; a public bot you've chatted with joins your bots. Tell someone about a public thing from its Share, and they get the link by email.",
       },
       {
         lead: "Asked before.",
-        text: "When you start a chat with a question that a public chat opened with too, a line above the reply points to it. The bot is shown the first answer from the closest one, so it can say \"this was answered here\" and add only what's different, rather than start from scratch.",
+        text: "When you start a chat with a question that a public chat opened with too, a line above the reply points to it, and the bot has seen that chat's first answer, so it can say \"this was answered here\" and add only what's different.",
       },
       {
-        lead: "Limits, so it stays sustainable.",
+        lead: "Dots on every chat.",
+        text: "Beside each chat in the list: Share, Copy link, and Delete or Leave. Beside each bot: New chat, Share, Copy link, Bot Manager.",
+      },
+      {
+        lead: "Limits, so public stays sustainable.",
         text: "Public chats together have a daily allowance of Lechuga's credits, and each person a daily number of messages in them. When either runs out, public chats pause until tomorrow; your own chats aren't affected.",
       },
     ],
@@ -127,23 +139,15 @@ const NEWS: NewsEntry[] = [
       },
       {
         lead: "Each bot has its own chats.",
-        text: "On the left, every bot is a group with a bar down its side in its own colour, its name at the top and its chats underneath. Chats people have shared with you sit at the bottom, and the search box at the top looks across everything.",
+        text: "On the left, every bot is a group with a bar down its side in its own colour, its name at the top and its chats underneath. The dots beside its name start a new chat with it, share it, copy its link, or open it in Bot Manager. The search box at the top looks across everything.",
       },
       {
-        lead: "Share a bot.",
-        text: "Share…, in the dots beside a bot's name (or at the foot of the bot in Bot Manager): add someone by username or email. They get the bot in their own list and their own chats with it; you see every one of those chats and can join in, and they're told so, on the bot and in each chat; the replies come out of your credits. Nothing they tell it is kept about them, and nothing Lechuga remembers about you reaches them. A member can leave from the same page.",
+        lead: "Bot Manager.",
+        text: "A page under Account with every bot on it: its name, the model its new chats start on, how it behaves, which you can rewrite from scratch, and who it's shared with. From a bot's dots it lands on that bot.",
       },
       {
         lead: "A guarded bot.",
-        text: "A switch on a bot in Bot Manager. On, the bot keeps everything it says suitable for a young person, however a request is framed, and can't search the web. Every message is checked before the bot sees it: if someone brings up hurting themselves or others, or weapons, the bot stops, tells them to talk to a trusted adult, and emails the bot's owner; explicit requests are simply refused. Anyone the bot is shared with is told it's guarded.",
-      },
-      {
-        lead: "An account for someone without an email.",
-        text: "In a bot's sharing, make them a username and a code instead. It's an account of its own, for that bot only: no credits, no invites, no bots of its own, and you can read every chat it has, hand out a new code, or remove it. They sign in at the usual place with \"I have a username and a code\". When the time comes, give it an email address and it becomes a full account, theirs.",
-      },
-      {
-        lead: "Three dots beside a bot's name.",
-        text: "New chat starts one with that bot. Bot Manager is a page under Account with every bot on it: its name, the model its new chats start on, and how it behaves, which you can rewrite from scratch. From the dots it lands on that bot.",
+        text: "A switch in Bot Manager. On, the bot keeps everything it says suitable for a young person, however a request is framed, and can't search the web. Every message is checked before the bot sees it: if someone brings up hurting themselves or others, or weapons, the bot stops, tells them to talk to a trusted adult, and emails the bot's owner; explicit requests are simply refused. Anyone the bot is shared with is told it's guarded.",
       },
       {
         lead: "Memory is yours; the soul is the bot's.",

@@ -49,6 +49,35 @@ export const HOME_SECTIONS: Section[] = [
         text:
           "We started it because we wanted somewhere to send our friends. Open source models turned out to be surprisingly good, good enough for nearly everything people actually use a chat assistant for, and we didn't see why using one should mean running your own server or reading pages of documentation first. So we built the easy version: sign in, type, get an answer, and pay only for what it costs.",
       },
+      {
+        text:
+          "Every chat is with a bot. You start with one, called Seed, and make more by naming them for a job (Sous Chef, Homework Helper): Lechuga works out from the name how each should behave, and you can rewrite that, pick a model for it, and share it.",
+      },
+    ],
+  },
+  {
+    id: "sharing",
+    title: "Sharing",
+    paragraphs: [
+      {
+        text:
+          "A chat or a bot has one setting for who can see it, with three choices: only you, people you choose, or everyone on Lechuga. Change it from Share, on the chat or the bot. Nothing changes until you press Done, and anything that takes access away asks first.",
+      },
+      {
+        lead: "A chat you share",
+        text:
+          "is read in full by the people you share it with, from the first message, and they can keep it going; every message shows who typed it. The replies come out of your credits, whoever asked. Remove someone and they lose sight of it; what they wrote stays.",
+      },
+      {
+        lead: "A bot you share",
+        text:
+          "gives each person their own chats with it, which you can read, and they're told so. You pay for those too. It's how a household shares one well-tuned bot, and how you set one up for someone who has no email address: make them a username and a code, and the account can only chat with what you've given it. Turn Guarded on in Bot Manager and the bot keeps everything suitable for a young person, with a check on every message that emails you about the serious kinds.",
+      },
+      {
+        lead: "Everyone on Lechuga",
+        text:
+          "means public: anyone signed in can read it and join in, it's listed under Public in the menu behind your name, and the replies come out of Lechuga's credits rather than yours. Your name is on it. A public bot makes every chat with it public, the ones so far included. Public can be undone from the same place.",
+      },
     ],
   },
   {
@@ -113,6 +142,10 @@ export const HOME_SECTIONS: Section[] = [
         text:
           "Your messages are stored in our database on Cloudflare so you can come back to them, and that's the only place they go. They aren't used to train anything, they aren't sold, and we don't have advertisers to share them with. We don't read them either. Delete a chat and it's gone, and delete your account and everything goes with it.",
       },
+      {
+        text:
+          "Nothing is seen by anyone else unless you choose it. A chat you share is read by the people you shared it with; a chat you make public is read by everyone on Lechuga, with your name on it, and you can make it private again. A bot can carry a short note about you from one chat to the next; it's yours to read, edit or wipe under Account, and it never goes into a chat anyone else can see.",
+      },
     ],
   },
   {
@@ -121,7 +154,7 @@ export const HOME_SECTIONS: Section[] = [
     paragraphs: [
       {
         text:
-          "There's no image generation, no video, no \"uncensored\" mode, no characters to talk to, no API and no enterprise plan. If you need those things, there are plenty of companies that would be happy to sell them to you.",
+          "There's no image generation, no video, no \"uncensored\" mode, no API and no enterprise plan. If you need those things, there are plenty of companies that would be happy to sell them to you.",
       },
     ],
   },
