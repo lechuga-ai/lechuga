@@ -100,6 +100,9 @@ export type BotRow = {
   // 1: the guard is on (guard.ts): locked prompt, a check on every message,
   // no tools, low effort raised. The owner's switch.
   guarded: number;
+  // 'public': anyone signed in can chat with it, and every chat with it is
+  // a public chat (public.ts).
+  visibility: "private" | "public";
   created_at: number;
   updated_at: number;
 };

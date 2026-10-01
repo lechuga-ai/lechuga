@@ -694,22 +694,20 @@ button {
   letter-spacing: 0.04em;
 }
 
-/* The public chats page: the link in the sidebar, the list. */
-.public-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  margin: -8px 0 14px;
-  border-radius: 9px;
-  color: #5f6659;
-  font-size: 13.5px;
-  text-decoration: none;
+/* Public, marked where the thing is: a ◎ before a chat's title or a bot's name. */
+.public-mark {
+  color: #6fae3b;
+  font-size: 13px;
+  line-height: 1;
+  cursor: default;
 }
 
-.public-link:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #1e221b;
+/* The public page: bots, then chats. */
+.doc-inner .public-heading {
+  margin: 18px 0 10px;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .public-search {

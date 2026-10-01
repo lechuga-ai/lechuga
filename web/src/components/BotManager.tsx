@@ -20,6 +20,7 @@ import {
 } from "../api";
 import { SEAT_DOMAIN } from "../../../worker/src/seat-email";
 import { copyText, seatLink } from "../copy";
+import { makeBotPublic } from "../api";
 import { Avatar } from "./Avatar";
 import type { Person } from "../api";
 import config from "../../../worker/config.json";
@@ -134,6 +135,7 @@ function BotPanel({ bot, models, highlighted, onSaved, onDeleted, onPeople }: Pa
     bot.is_default === 1 ? "the one every account starts with" : null,
     modelLabel ? `on ${modelLabel}` : null,
     bot.guarded === 1 ? "guarded" : null,
+    bot.visibility === "public" ? "public" : null,
     sharedWith > 0 ? `shared with ${sharedWith} ${sharedWith === 1 ? "person" : "people"}` : null,
   ].filter(Boolean);
 
@@ -208,7 +210,7 @@ function BotPanel({ bot, models, highlighted, onSaved, onDeleted, onPeople }: Pa
       </form>
       <details className="bot-details bot-sharing">
         <summary>Sharing{sharedWith > 0 ? ` · ${sharedWith} ${sharedWith === 1 ? "person" : "people"}` : ""}</summary>
-        <BotShare bot={bot} onPeople={onPeople} />
+        <BotShare bot={bot} onPeople={onPeople} onPublic={onSaved} />
       </details>
     </section>
   );
@@ -218,7 +220,18 @@ function BotPanel({ bot, models, highlighted, onSaved, onDeleted, onPeople }: Pa
 // takes them out again; what sharing a bot means is spelled out, since it's
 // their credits and they'll be reading.
 // onClose: the panel is a dialog, so the share screen ends in a Done.
-export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (people: Person[] | undefined) => void; onClose?: () => void }) {
+// onPublic: the bot was made public.
+export function BotShare({
+  bot,
+  onPeople,
+  onPublic,
+  onClose,
+}: {
+  bot: Bot;
+  onPeople: (people: Person[] | undefined) => void;
+  onPublic?: (bot: Bot) => void;
+  onClose?: () => void;
+}) {
   const [roster, setRoster] = useState<BotRoster | null>(null);
   const [who, setWho] = useState("");
   const [busy, setBusy] = useState(false);
@@ -250,6 +263,27 @@ export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (peop
       .then((r) => setRoster(r.roster))
       .catch(() => setError("couldn't load who has this bot"));
   }, [bot.id]);
+
+  async function goPublic() {
+    if (busy) return;
+    if (
+      !window.confirm(
+        `Make ${bot.name} public? Anyone on Lechuga will be able to find it and chat with it, and every chat with it, the ones you've had so far included, becomes public: anyone can read them. From now on its replies come out of Lechuga's credits. This can't be undone, though you can still delete the bot.`
+      )
+    )
+      return;
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await makeBotPublic(bot.id);
+      setDone(`${bot.name} is public now.`);
+      onPublic?.({ ...bot, ...next });
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function addSeat(e: FormEvent) {
     e.preventDefault();
@@ -504,6 +538,24 @@ export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (peop
       )}
       {done && <p className="modal-ok">{done}</p>}
       {error && <p className="modal-error">{error}</p>}
+      {bot.visibility === "public" ? (
+        <p className="share-public-note">
+          <b>This bot is public.</b> Anyone can find it and chat with it, and every chat with it is public, on Lechuga's credits.
+        </p>
+      ) : (
+        bot.guarded !== 1 &&
+        !needsInvite && (
+          <div className="share-public">
+            <p>
+              <strong>Or make it public.</strong> Anyone on Lechuga can find it and chat with it; every chat with it, yours so far included, becomes
+              readable by everyone; and its replies come out of Lechuga's credits. It can't be made private again. Not while it's shared with anyone.
+            </p>
+            <button type="button" className="signin-link" onClick={goPublic} disabled={busy}>
+              make this bot public
+            </button>
+          </div>
+        )
+      )}
       {roster && (active.length > 0 || roster.pending.length > 0 || removed.length > 0) && (
         <ul className="share-people">
           {active.map((p) => (

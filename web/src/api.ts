@@ -166,6 +166,8 @@ export type Bot = {
   is_default: number;
   // The guard is on: locked prompt, every message checked, no web tools.
   guarded: number;
+  // 'public': anyone can chat with it, and every chat with it is public.
+  visibility: "private" | "public";
   created_at: number;
   updated_at: number;
   role: "owner" | "member";
@@ -212,6 +214,18 @@ export async function listPublicChats(q = ""): Promise<PublicChatSummary[]> {
 
 export async function makeChatPublic(chatId: string): Promise<void> {
   await expectJson(await apiFetch(`/api/public/chats/${chatId}/public`, { method: "POST" }));
+}
+
+// Public bots: anyone can chat with one, and every chat with it is public.
+export type PublicBotSummary = { id: string; name: string; soul: string; owner: Person; chats: number; updated_at: number };
+
+export async function listPublicBots(q = ""): Promise<PublicBotSummary[]> {
+  return expectJson(await apiFetch(`/api/public/bots${q ? `?q=${encodeURIComponent(q)}` : ""}`));
+}
+
+// For keeps: the bot and every chat with it, so far and from now on.
+export async function makeBotPublic(botId: string): Promise<Bot> {
+  return expectJson(await apiFetch(`/api/public/bots/${botId}/public`, { method: "POST" }));
 }
 
 export async function listBots(): Promise<Bot[]> {

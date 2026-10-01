@@ -97,15 +97,19 @@ chat.get("/chats/search", async (c) => {
   const userId = c.get("userId");
   const like = (w: string) => `%${w.replace(/[\\%_]/g, (ch) => "\\" + ch)}%`;
   const clauses = words.map((_, i) => `lower(m.content) LIKE ?${i + 2} ESCAPE '\\'`).join(" AND ");
+  // Mine, the ones shared with me, and (unless I'm a username-and-code
+  // account) the public ones, which are everyone's to find.
+  const seat = c.get("seatOf") !== null;
   const { results: hits } = await c.env.DB.prepare(
     `SELECT m.chat_id, m.content FROM messages m
      WHERE m.chat_id IN (
        SELECT id FROM chats WHERE user_id = ?1
-       UNION SELECT chat_id FROM chat_members WHERE user_id = ?1 AND removed_at IS NULL)
+       UNION SELECT chat_id FROM chat_members WHERE user_id = ?1 AND removed_at IS NULL
+       UNION SELECT id FROM chats WHERE visibility = 'public' AND ?2 = 0)
      AND ${clauses}
      ORDER BY m.created_at DESC LIMIT 300`
   )
-    .bind(userId, ...words.map(like))
+    .bind(userId, seat ? 1 : 0, ...words.map(like))
     .all<{ chat_id: string; content: string }>();
 
   const snippetOf = new Map<string, string>();
@@ -123,7 +127,20 @@ chat.get("/chats/search", async (c) => {
   }
 
   const mine = await listChats(c.env, userId);
-  const matches = mine
+  const seen = new Set(mine.map((ch) => ch.id));
+  // Public chats that matched and aren't already in my list.
+  const extra = seat
+    ? []
+    : (
+        await c.env.DB.prepare(
+          `SELECT c.* FROM chats c WHERE c.visibility = 'public' AND (c.id IN (${[...snippetOf.keys()].map(() => "?").join(",") || "''"})
+           OR ${words.map((_, i) => `lower(c.title) LIKE ?${snippetOf.size + i + 1} ESCAPE '\\'`).join(" AND ")})
+           ORDER BY c.updated_at DESC LIMIT 50`
+        )
+          .bind(...snippetOf.keys(), ...words.map(like))
+          .all<ChatRow>()
+      ).results.filter((ch) => !seen.has(ch.id));
+  const matches = [...mine, ...extra]
     .filter((ch) => snippetOf.has(ch.id) || (ch.title && words.every((w) => ch.title!.toLowerCase().includes(w))))
     .slice(0, 50)
     .map((ch) => ({ ...ch, snippet: snippetOf.get(ch.id) ?? null }));
@@ -137,7 +154,7 @@ chat.get("/chats/search", async (c) => {
 chat.post("/chats", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const userId = c.get("userId");
-  const shared = typeof body?.bot === "string" ? (await botAccess(c.env, body.bot, userId))?.bot : null;
+  const shared = typeof body?.bot === "string" ? (await botAccess(c.env, body.bot, userId, c.get("seatOf") !== null))?.bot : null;
   // A seat has no Seed to fall back on: only a bot it's been let into.
   if (!shared && c.get("seatOf")) return c.json({ error: "this account can only chat with the bots shared with it" }, 403);
   const bot = shared || (await defaultBot(c.env, userId));
@@ -145,10 +162,11 @@ chat.post("/chats", async (c) => {
 
   const id = crypto.randomUUID();
   const now = Date.now();
+  // With a public bot, the chat is public from the start (public.ts).
   await c.env.DB.prepare(
-    "INSERT INTO chats (id, user_id, bot_id, title, model, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?)"
+    "INSERT INTO chats (id, user_id, bot_id, title, model, visibility, created_at, updated_at) VALUES (?, ?, ?, NULL, ?, ?, ?, ?)"
   )
-    .bind(id, userId, bot.id, model, now, now)
+    .bind(id, userId, bot.id, model, bot.visibility === "public" ? "public" : "private", now, now)
     .run();
   return c.json({ id, bot: bot.id });
 });

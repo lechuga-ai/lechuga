@@ -19,6 +19,8 @@ type Props = {
   onBotStart: (bot: Bot) => void;
   // Who has a bot changed (the share dialog), so its faces follow.
   onBotPeople: (botId: string, people: Person[] | undefined) => void;
+  // A bot changed in the share dialog (made public).
+  onBotUpdated: (bot: Bot) => void;
   activeChatId: string | null;
   open: boolean;
   onSelect: (id: string) => void;
@@ -57,6 +59,7 @@ export function Sidebar({
   onBotCreated,
   onBotStart,
   onBotPeople,
+  onBotUpdated,
   activeChatId,
   open,
   onSelect,
@@ -134,6 +137,12 @@ export function Sidebar({
   function chatRow(chat: Chat & { snippet?: string | null }) {
     return (
       <div key={chat.id} className={`chat-list-item ${chat.id === activeChatId ? "active" : ""}`} onClick={() => onSelect(chat.id)}>
+        {/* Public: anyone can read it, like the faces say it's shared. */}
+        {chat.visibility === "public" && (
+          <span className="public-mark" title="Public: anyone on Lechuga can read this chat">
+            ◎
+          </span>
+        )}
         <span className="chat-title">{chat.title ?? "New chat"}</span>
         {chat.snippet && <span className="chat-snippet">{chat.snippet}</span>}
         {/* Shared: everyone in it, the owner ringed. */}
@@ -186,12 +195,7 @@ export function Sidebar({
           <span className="new-bot-plus">+</span> New bot
         </button>
       )}
-      {/* Everyone's open chats, on their own page. Not for a username-and-code account. */}
-      {!me.seat && (
-        <Link to="/public" className="public-link">
-          <span className="new-bot-plus">◎</span> Public chats
-        </Link>
-      )}
+
       <div className="chat-list">
         {searching && hits !== null && hits.length === 0 && <p className="chat-list-empty">No chat has those words.</p>}
         {searching && (hits ?? []).map((chat) => chatRow(chat))}
@@ -202,6 +206,11 @@ export function Sidebar({
           groups.map(({ bot, chats: own }) => (
             <div key={bot.id} className="bot-group" style={{ borderLeftColor: colourFor(bot.id) }}>
               <div className="bot-row">
+                {bot.visibility === "public" && (
+                  <span className="public-mark" title="Public: anyone on Lechuga can chat with this bot, and every chat with it is public">
+                    ◎
+                  </span>
+                )}
                 <span className="bot-row-name">{bot.name}</span>
                 {/* Once shared: everyone with it, the owner ringed. */}
                 {bot.people && <AvatarStack people={bot.people} ownerId={bot.user_id} size={16} max={3} />}
@@ -296,7 +305,15 @@ export function Sidebar({
         createPortal(
           <div className="modal-backdrop" onClick={() => setShareBot(null)}>
             <div className="modal share-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-              <BotShare bot={shareBot} onPeople={(people) => onBotPeople(shareBot.id, people)} onClose={() => setShareBot(null)} />
+              <BotShare
+                bot={shareBot}
+                onPeople={(people) => onBotPeople(shareBot.id, people)}
+                onPublic={(bot) => {
+                  onBotUpdated(bot);
+                  setShareBot(bot);
+                }}
+                onClose={() => setShareBot(null)}
+              />
             </div>
           </div>,
           document.body
@@ -329,6 +346,13 @@ export function Sidebar({
             {/* Feedback, Getting started with AI and About Lechuga live on
                 the Help pages (linked from the footer too) instead of
                 crowding this menu. */}
+            {/* Everyone's public chats and bots, for browsing without a
+                query; the search box above finds them too. */}
+            {!me.seat && (
+              <Link to="/public" role="menuitem" onClick={() => setMenuOpen(false)}>
+                Public
+              </Link>
+            )}
             <Link to="/help" role="menuitem" onClick={() => setMenuOpen(false)}>
               Help
             </Link>

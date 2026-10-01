@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv, ChatRow, Env } from "./types";
 import { chatAccess, peopleByIds, type Person } from "./sharing";
-import { botFor } from "./bots";
+import { botAccess, botFor, type BotView } from "./bots";
 import { splitMessage } from "./attachments";
 import config from "../config.json";
 
@@ -117,7 +117,63 @@ export async function firstAnswer(env: Env, chatId: string): Promise<string | nu
   return row ? row.content.slice(0, PUBLIC.bring_in_chars) : null;
 }
 
+export type PublicBotSummary = { id: string; name: string; soul: string; owner: Person; chats: number; updated_at: number };
+
 export const publicChats = new Hono<AppEnv>();
+
+// The browse page's bots: public ones, most recently active first, with
+// the opening of their soul so people know what they're for.
+publicChats.get("/bots", async (c) => {
+  const q = (c.req.query("q") ?? "").trim().slice(0, 200).toLowerCase();
+  const words = q.split(/\s+/).filter(Boolean).slice(0, 6);
+  const like = (w: string) => `%${w.replace(/[\\%_]/g, (ch) => "\\" + ch)}%`;
+  const clauses = words.map((_, i) => `(lower(b.name) LIKE ?${i + 1} ESCAPE '\\' OR lower(b.soul) LIKE ?${i + 1} ESCAPE '\\')`).join(" AND ");
+  const { results } = await c.env.DB.prepare(
+    `SELECT b.id, b.name, b.soul, b.user_id, b.updated_at, (SELECT COUNT(*) FROM chats WHERE bot_id = b.id) AS chats FROM bots b
+     WHERE b.visibility = 'public' ${clauses ? `AND ${clauses}` : ""} ORDER BY b.updated_at DESC LIMIT 50`
+  )
+    .bind(...words.map(like))
+    .all<{ id: string; name: string; soul: string; user_id: string; updated_at: number; chats: number }>();
+  const people = await peopleByIds(c.env, results.map((r) => r.user_id));
+  const out: PublicBotSummary[] = results.map((r) => ({
+    id: r.id,
+    name: r.name,
+    soul: r.soul.slice(0, 200),
+    owner: people.get(r.user_id) ?? { id: r.user_id, name: "someone who left", username: null, photo: null },
+    chats: r.chats,
+    updated_at: r.updated_at,
+  }));
+  return c.json(out);
+});
+
+// Make a bot public: the owner's call, for keeps. Everything in it becomes
+// public, the chats so far included, so a bot that's been shared with
+// people can't go (their chats would be published; remove them first), and
+// neither can a guarded one.
+publicChats.post("/bots/:id/public", async (c) => {
+  const userId = c.get("userId");
+  if (c.get("seatOf")) return c.json({ error: "not available on this account" }, 403);
+  const access = await botAccess(c.env, c.req.param("id"), userId);
+  if (!access) return c.json({ error: "not found" }, 404);
+  if (access.role !== "owner") return c.json({ error: "only the bot's owner can make it public" }, 403);
+  const bot = access.bot;
+  if (bot.visibility === "public") return c.json({ ok: true, already: true });
+  if (bot.guarded) return c.json({ error: "a guarded bot can't be made public" }, 403);
+  const shared = await c.env.DB.prepare(
+    "SELECT (SELECT COUNT(*) FROM bot_members WHERE bot_id = ?1 AND removed_at IS NULL) + (SELECT COUNT(*) FROM bot_pending_shares WHERE bot_id = ?1) AS n"
+  )
+    .bind(bot.id)
+    .first<{ n: number }>();
+  if ((shared?.n ?? 0) > 0) return c.json({ error: "a bot you've shared can't be made public, since that would publish their chats; remove them first" }, 403);
+  await houseAccount(c.env);
+  const now = Date.now();
+  await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE bots SET visibility = 'public', updated_at = ? WHERE id = ?").bind(now, bot.id),
+    c.env.DB.prepare("UPDATE chats SET visibility = 'public', updated_at = ? WHERE bot_id = ?").bind(now, bot.id),
+  ]);
+  const view: BotView = { ...bot, visibility: "public", updated_at: now, role: "owner" };
+  return c.json(view);
+});
 
 // The browse page: public chats, newest first, or the ones whose title or
 // messages contain every word of ?q.

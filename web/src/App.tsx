@@ -166,7 +166,7 @@ export default function App({ me, onSignOut }: Props) {
   // The start composer: create the chat, hand its first message to the chat
   // page, and move to /c/:id where the reply streams in.
   async function handleStartSend(content: string, model?: string, attachments: Attachment[] = []) {
-    const { id } = await createChat(model || selectedModel, selectedBot?.id);
+    const { id } = await createChat(model || selectedModel, startBotId ?? selectedBot?.id);
     await refreshChats();
     setStartMessage(id, content, attachments);
     navigate(`/c/${id}`);
@@ -188,6 +188,7 @@ export default function App({ me, onSignOut }: Props) {
         onBotCreated={handleBotCreated}
         onBotStart={(bot) => selectBot(bot.id)}
         onBotPeople={(botId, people) => setBots((prev) => prev.map((b) => (b.id === botId ? { ...b, people } : b)))}
+        onBotUpdated={handleBotCreated}
         activeChatId={activeChatId}
         open={drawerOpen}
         onSelect={selectChat}
@@ -213,7 +214,7 @@ export default function App({ me, onSignOut }: Props) {
         />
         <Route
           path="/b/:botId"
-          element={<BotStartPage bot={selectedBot} models={models} selectedModel={selectedModel} onSelectModel={setSelectedModel} onSend={handleStartSend} />}
+          element={<BotStartPage botId={startBotId ?? ""} bot={selectedBot} models={models} selectedModel={selectedModel} onSelectModel={setSelectedModel} onSend={handleStartSend} />}
         />
         <Route
           path="/c/:id"
