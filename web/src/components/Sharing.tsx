@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { ApiError, sendPublicPointer, type BotRoster, type Person, type Roster } from "../api";
+import { ApiError, makePrivate, sendPublicPointer, type BotRoster, type Person, type Roster } from "../api";
 import { Avatar } from "./Avatar";
 import { appLink, copyText, seatLink } from "../copy";
 import { SEAT_DOMAIN } from "../../../worker/src/seat-email";
@@ -37,6 +37,8 @@ export type SharingTarget = {
   };
   onRoster: (roster: AnyRoster) => void;
   onPublic: () => void;
+  // Private again (the worker does the work; this is for the caller's state).
+  onPrivate: () => void;
 };
 
 type Level = "me" | "people" | "everyone";
@@ -78,6 +80,26 @@ export function SharingPanel({ target }: { target: SharingTarget }) {
       const r = await sendPublicPointer(t.kind, t.id, entered);
       setNote(`Sent to ${r.sentTo}.`);
       setTell("");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function goPrivate() {
+    if (busy) return;
+    const warning =
+      t.kind === "chat"
+        ? "Make this chat private again? People who joined it lose sight of it; anyone you shared it with on purpose keeps it. What anyone wrote stays."
+        : `Make ${t.name} private again? It and every chat with it stop being everyone's. People who started chats with it keep those chats, as people you've shared the bot with, and you pay for them from here; you can remove them from its sharing.`;
+    if (!window.confirm(warning)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await makePrivate(t.kind, t.id);
+      setLevel("me");
+      t.onPrivate();
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -127,6 +149,12 @@ export function SharingPanel({ target }: { target: SharingTarget }) {
         <p className="sharing-why">They get an email with the link. Nothing else changes: public is everyone's already.</p>
         {note && <p className="modal-ok">{note}</p>}
         {error && <p className="modal-error">{error}</p>}
+        <p className="sharing-offer">
+          Changed your mind?{" "}
+          <button type="button" className="signin-link" onClick={() => void goPrivate()} disabled={busy}>
+            make it private again
+          </button>
+        </p>
       </div>
     );
   }
@@ -442,8 +470,8 @@ export function SharingPanel({ target }: { target: SharingTarget }) {
                 : !t.canPublic && t.publicReason
                   ? t.publicReason
                   : t.kind === "chat"
-                    ? "Anyone can read it and join in. Lechuga pays. Can't be undone."
-                    : "Anyone can chat with it, and every chat with it is public, yours so far included. Lechuga pays. Can't be undone."}
+                    ? "Anyone can read it and join in. Lechuga pays."
+                    : "Anyone can chat with it, and every chat with it is public, yours so far included. Lechuga pays."}
             </span>
           </span>
         </label>

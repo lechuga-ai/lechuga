@@ -149,10 +149,10 @@ publicChats.get("/bots", async (c) => {
   return c.json(out);
 });
 
-// Make a bot public: the owner's call, for keeps. Everything in it becomes
-// public, the chats so far included, so a bot that's been shared with
-// people can't go (their chats would be published; remove them first), and
-// neither can a guarded one.
+// Make a bot public: the owner's call. Everything in it becomes public,
+// the chats so far included, so a bot that's been shared with people can't
+// go (their chats would be published; remove them first), and neither can
+// a guarded one. It can be made private again.
 publicChats.post("/bots/:id/public", async (c) => {
   const userId = c.get("userId");
   if (c.get("seatOf")) return c.json({ error: "not available on this account" }, 403);
@@ -271,8 +271,56 @@ publicChats.post("/bots/:id/invite", async (c) => {
   return pointer(c, "bot", access.bot.name, `${c.env.BASE_URL}/b/${access.bot.id}`, access.bot.user_id);
 });
 
+// Private again, for a chat: the people who joined it while it was public
+// (they added themselves) lose sight of it; anyone the owner shared it with
+// on purpose keeps it. What anyone wrote stays.
+async function chatPrivate(env: Env, chatId: string, now: number): Promise<D1PreparedStatement[]> {
+  return [
+    env.DB.prepare("UPDATE chats SET visibility = 'private', updated_at = ? WHERE id = ?").bind(now, chatId),
+    env.DB.prepare("UPDATE chat_members SET removed_at = ? WHERE chat_id = ? AND removed_at IS NULL AND added_by = user_id").bind(now, chatId),
+  ];
+}
+
+publicChats.post("/chats/:id/private", async (c) => {
+  const userId = c.get("userId");
+  const access = await chatAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
+  if (!access) return c.json({ error: "not found" }, 404);
+  if (access.chat.user_id !== userId) return c.json({ error: "only the person who started a chat can make it private" }, 403);
+  if (access.chat.visibility !== "public") return c.json({ ok: true, already: true });
+  await c.env.DB.batch(await chatPrivate(c.env, access.chat.id, Date.now()));
+  return c.json({ ok: true });
+});
+
+// Private again, for a bot: the bot, and every chat with it. Chats that
+// strangers started with it while it was public stay theirs to read (they
+// started them) and the owner's (it's the owner's bot), as with a bot
+// shared on purpose; they just stop being everyone's, and the owner pays
+// for them from here, as for any shared bot. The owner can remove those
+// people from the bot's sharing, or delete the chats.
+publicChats.post("/bots/:id/private", async (c) => {
+  const userId = c.get("userId");
+  const access = await botAccess(c.env, c.req.param("id"), userId);
+  if (!access) return c.json({ error: "not found" }, 404);
+  if (access.role !== "owner") return c.json({ error: "only the bot's owner can make it private" }, 403);
+  const bot = access.bot;
+  if (bot.visibility !== "public") return c.json({ ok: true, already: true });
+  const now = Date.now();
+  const { results: chats } = await c.env.DB.prepare("SELECT id, user_id FROM chats WHERE bot_id = ?").bind(bot.id).all<{ id: string; user_id: string }>();
+  const statements: D1PreparedStatement[] = [c.env.DB.prepare("UPDATE bots SET visibility = 'private', updated_at = ? WHERE id = ?").bind(now, bot.id)];
+  for (const ch of chats) statements.push(...(await chatPrivate(c.env, ch.id, now)));
+  // Whoever started a chat with it while public keeps that chat: they're a
+  // member of the bot from here, which is what makes it theirs to read.
+  for (const starter of new Set(chats.map((ch) => ch.user_id).filter((id) => id !== userId))) {
+    statements.push(
+      c.env.DB.prepare("INSERT INTO bot_members (bot_id, user_id, added_by, added_at) VALUES (?1, ?2, ?2, ?3) ON CONFLICT(bot_id, user_id) DO UPDATE SET removed_at = NULL").bind(bot.id, starter, now)
+    );
+  }
+  await c.env.DB.batch(statements);
+  return c.json({ ...bot, visibility: "private", updated_at: now, role: "owner" });
+});
+
 // Make a chat public. The owner's call, on a chat with their own bot, not a
-// guarded one, and it's for keeps.
+// guarded one. It can be made private again.
 publicChats.post("/chats/:id/public", async (c) => {
   const userId = c.get("userId");
   if (c.get("seatOf")) return c.json({ error: "not available on this account" }, 403);

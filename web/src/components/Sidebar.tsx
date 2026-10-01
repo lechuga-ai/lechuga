@@ -394,6 +394,7 @@ export function Sidebar({
               makePublic: () => makeChatPublic(shareChat.chat.id),
               onRoster: (r) => setShareChat({ ...shareChat, roster: r as Roster }),
               onPublic: () => setShareChat({ ...shareChat, chat: { ...shareChat.chat, visibility: "public" } }),
+              onPrivate: () => void openChatSharing({ ...shareChat.chat, visibility: "private" }),
             }}
             onClose={() => {
               setShareChat(null);

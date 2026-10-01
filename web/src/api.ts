@@ -223,6 +223,13 @@ export async function listPublicBots(q = ""): Promise<PublicBotSummary[]> {
   return expectJson(await apiFetch(`/api/public/bots${q ? `?q=${encodeURIComponent(q)}` : ""}`));
 }
 
+// Private again. A chat: the people who joined it lose sight of it. A bot:
+// the bot and every chat with it; people who started chats with it keep
+// those, as members of the bot.
+export async function makePrivate(kind: "chat" | "bot", id: string): Promise<void> {
+  await expectJson(await apiFetch(`/api/public/${kind}s/${id}/private`, { method: "POST" }));
+}
+
 // Point someone at a public chat or bot: an email with the link, nothing more.
 export async function sendPublicPointer(kind: "chat" | "bot", id: string, who: string): Promise<{ sentTo: string }> {
   return expectJson(await postJson(`/api/public/${kind}s/${id}/invite`, { who }));

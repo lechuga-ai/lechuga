@@ -331,6 +331,11 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
                 setIsPublic(true);
                 void refreshChats();
               },
+              onPrivate: () => {
+                setIsPublic(false);
+                setRoster((r) => (r ? { ...r, members: r.members.filter((m) => !m.removed) } : r));
+                void refreshChats();
+              },
             }}
             onClose={() => setSharing(false)}
           />,

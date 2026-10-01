@@ -270,6 +270,12 @@ export function BotShare({
     },
     onRoster: (r) => took(r as BotRoster),
     onPublic: () => {},
+    onPrivate: () => {
+      onPublic?.({ ...bot, visibility: "private" });
+      getBot(bot.id)
+        .then((r) => took(r.roster))
+        .catch(() => {});
+    },
   };
 
   return (

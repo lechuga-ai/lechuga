@@ -91,11 +91,11 @@ const NEWS: NewsEntry[] = [
     items: [
       {
         lead: "Make a chat public.",
-        text: "Share, then Everyone on Lechuga. Sharing is a setting with three levels now, the same for a chat and a bot: only me, people I choose, everyone. Everyone on Lechuga can then read all of it and join in, and the replies come out of Lechuga's credits instead of yours. Your name is on it, and it can't be made private again, though you can still delete it. Only a chat with your own bot, and not a guarded one.",
+        text: "Share, then Everyone on Lechuga. Sharing is a setting with three levels now, the same for a chat and a bot: only me, people I choose, everyone. Everyone on Lechuga can then read all of it and join in, and the replies come out of Lechuga's credits instead of yours. Your name is on it. You can make it private again from the same place; people who joined it then lose sight of it. Only a chat with your own bot, and not a guarded one.",
       },
       {
         lead: "Make a bot public.",
-        text: "Share…, then Everyone on Lechuga. Anyone can then find it and chat with it, and everything in it is public: the chats you've had with it so far, and every chat anyone has with it from then on. Its replies are on Lechuga from then on. Not a guarded bot, and not one you've shared with people, since that would publish their chats.",
+        text: "Share…, then Everyone on Lechuga. Anyone can then find it and chat with it, and everything in it is public: the chats you've had with it so far, and every chat anyone has with it from then on. Its replies are on Lechuga from then on. Not a guarded bot, and not one you've shared with people, since that would publish their chats. It can be made private again; people who started chats with it keep those, as people you've shared it with.",
       },
       {
         lead: "Finding them.",
