@@ -95,7 +95,12 @@ function InviteRoute() {
   return <SignInScreen callbackURL="/" inviteToken={token} />;
 }
 
+// Signed out at a page that needs a session: a chat, a bot's start page.
+// A link made for a username-and-code account carries ?u=<username>, which
+// opens that sign-in with the name filled in; the page itself is where
+// they land after.
 function ReturnRoute() {
-  const { pathname } = useLocation();
-  return <SignInScreen callbackURL={pathname} />;
+  const { pathname, search } = useLocation();
+  const seatUsername = new URLSearchParams(search).get("u");
+  return <SignInScreen callbackURL={pathname} seatUsername={seatUsername} />;
 }

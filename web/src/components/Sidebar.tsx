@@ -6,6 +6,7 @@ import { Avatar, AvatarStack, colourFor } from "./Avatar";
 import { InviteDialog } from "./InviteDialog";
 import { NewBotDialog } from "./NewBotDialog";
 import { BotShare } from "./BotManager";
+import { appLink, copyText } from "../copy";
 import type { Person } from "../api";
 import { Copyright } from "./SiteFooter";
 
@@ -232,6 +233,16 @@ export function Sidebar({
                         Share…
                       </button>
                     )}
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setBotMenu(null);
+                        void copyText(appLink(`/b/${bot.id}`));
+                      }}
+                    >
+                      Copy link
+                    </button>
                     <Link to={`/settings/bots#${bot.id}`} role="menuitem" onClick={() => setBotMenu(null)}>
                       Bot Manager
                     </Link>

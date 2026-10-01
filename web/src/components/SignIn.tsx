@@ -20,6 +20,9 @@ type CardProps = {
   // Open straight on the request-access form (the home page's "Request an
   // invite" button) instead of on sign-in.
   startOnRequest?: boolean;
+  // From a link made for a username-and-code account (?u=): open on that
+  // sign-in with the username filled in.
+  seatUsername?: string | null;
   // Offered only when the card is an overlay on another page.
   onClose?: () => void;
 };
@@ -37,12 +40,12 @@ const INSTALLED = isInstalledApp();
 // people without an invite. One Turnstile widget serves both forms; it stays
 // mounted at the bottom of the card while the forms above it swap. Used as an
 // overlay on the home page and inside SignInScreen below.
-export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = false, onClose }: CardProps) {
+export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = false, seatUsername = null, onClose }: CardProps) {
   const [config, setConfig] = useState<AuthConfig | null>(null);
-  const [view, setView] = useState<View>(startOnRequest ? "invite-only" : "signin");
+  const [view, setView] = useState<View>(startOnRequest ? "invite-only" : seatUsername && !NATIVE ? "seat" : "signin");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [seatName, setSeatName] = useState("");
+  const [seatName, setSeatName] = useState(seatUsername ?? "");
   const [seatCode, setSeatCode] = useState("");
   const [emailLocked, setEmailLocked] = useState(false);
   const [inviteNote, setInviteNote] = useState<string | null>(null);
@@ -486,7 +489,7 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
 // session: a chat URL, /billing, or an invite link (then with the token). The
 // wordmark leads back to the landing page; the card returns them to where
 // they were headed once the session exists.
-export function SignInScreen({ callbackURL, inviteToken = null }: { callbackURL: string; inviteToken?: string | null }) {
+export function SignInScreen({ callbackURL, inviteToken = null, seatUsername = null }: { callbackURL: string; inviteToken?: string | null; seatUsername?: string | null }) {
   return (
     <div className="home">
       <section className="home-hero">
@@ -497,7 +500,7 @@ export function SignInScreen({ callbackURL, inviteToken = null }: { callbackURL:
         </h1>
         </Link>
         <p className="hero-tag">Lechuga is lettuce in Spanish.</p>
-        <SignInCard callbackURL={callbackURL} inviteToken={inviteToken} />
+        <SignInCard callbackURL={callbackURL} inviteToken={inviteToken} seatUsername={seatUsername} />
       </section>
     </div>
   );

@@ -31,7 +31,9 @@ export type Chat = {
 // keeps their name; pending (owner only) is shares waiting for a sign-up.
 export type Roster = {
   owner: Person;
-  members: (Person & { removed: boolean })[];
+  // seat: a username-and-code account, which can be handed a link that
+  // signs it in.
+  members: (Person & { removed: boolean; seat?: boolean })[];
   pending: { id: string; email: string }[];
 };
 

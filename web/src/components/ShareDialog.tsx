@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { ApiError, addChatMember, cancelPendingShare, removeChatMember, type Roster } from "../api";
 import { Avatar } from "./Avatar";
+import { copyText, seatLink } from "../copy";
 
 type Props = {
   chatId: string;
@@ -126,6 +127,19 @@ export function ShareDialog({ chatId, roster, onRoster, onClose }: Props) {
                 {p.name}
                 {p.username && p.name !== `@${p.username}` && <span className="share-handle"> @{p.username}</span>}
               </span>
+              {/* A username-and-code account: a link that opens the sign-in
+                  with the name filled in and lands on this chat. */}
+              {p.seat && p.username && (
+                <button
+                  type="button"
+                  className="signin-link"
+                  disabled={busy}
+                  title="Copy a link that opens the sign-in with their username filled in and lands on this chat"
+                  onClick={() => void copyText(seatLink(`/c/${chatId}`, p.username!))}
+                >
+                  link
+                </button>
+              )}
               <button
                 type="button"
                 className="signin-link"

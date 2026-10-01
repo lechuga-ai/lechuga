@@ -19,6 +19,7 @@ import {
   type Model,
 } from "../api";
 import { SEAT_DOMAIN } from "../../../worker/src/seat-email";
+import { copyText, seatLink } from "../copy";
 import { Avatar } from "./Avatar";
 import type { Person } from "../api";
 import config from "../../../worker/config.json";
@@ -340,6 +341,14 @@ export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (peop
             They sign in at the usual place with "I have a username and a code". (It's stored as {handOver.username}@{SEAT_DOMAIN}, an address that gets
             no mail.)
           </p>
+          <p className="bot-seat-link">
+            Or send them this link. It opens the sign-in with the username filled in and lands on {bot.name}:
+            <br />
+            <code>{seatLink(`/b/${bot.id}`, handOver.username)}</code>{" "}
+            <button type="button" className="signin-link" onClick={() => void copyText(seatLink(`/b/${bot.id}`, handOver.username))}>
+              copy
+            </button>
+          </p>
         </div>
         <div className="modal-actions">
           <button
@@ -507,6 +516,17 @@ export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (peop
               </span>
               {p.seat && (
                 <>
+                  {p.username && (
+                    <button
+                      type="button"
+                      className="signin-link"
+                      disabled={busy}
+                      title="Copy a link that opens the sign-in with their username filled in and lands on this bot"
+                      onClick={() => void copyText(seatLink(`/b/${bot.id}`, p.username!))}
+                    >
+                      link
+                    </button>
+                  )}
                   <button type="button" className="signin-link" disabled={busy} onClick={() => void newCode(p.id)}>
                     new code
                   </button>
