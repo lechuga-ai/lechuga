@@ -46,6 +46,9 @@ me.get("/", async (c) => {
     // before anything else (Root.tsx). A seat is never asked: its holder
     // answers for it.
     termsCurrent: c.get("seatOf") !== null || (row?.terms_accepted_at !== null && row?.terms_version === config.terms_version),
+    // Null when none were ever accepted by this person: an account made for
+    // them and just made their own.
+    termsVersion: row?.terms_accepted_at ? (row.terms_version ?? null) : null,
   });
 });
 

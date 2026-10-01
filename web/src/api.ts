@@ -381,6 +381,9 @@ export type Me = {
   seat: boolean;
   // False when the current terms haven't been accepted: the app asks first.
   termsCurrent: boolean;
+  // The version accepted so far; null when never (an account just made
+  // someone's own), which changes what the page says.
+  termsVersion: string | null;
 };
 
 export async function acceptTerms(): Promise<void> {
