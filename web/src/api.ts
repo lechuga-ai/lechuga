@@ -160,6 +160,8 @@ export type Bot = {
   soul: string;
   model: string | null;
   is_default: number;
+  // The guard is on: locked prompt, every message checked, no web tools.
+  guarded: number;
   created_at: number;
   updated_at: number;
   role: "owner" | "member";
@@ -191,8 +193,9 @@ export async function cancelBotPendingShare(botId: string, pendingId: string): P
   return expectJson(await apiFetch(`/api/bots/${botId}/pending/${pendingId}`, { method: "DELETE" }));
 }
 
-// Takes a few seconds: the worker has the model draft a soul from the name.
-export async function createBot(name: string): Promise<Bot> {
+// Comes back at once with an empty soul; the worker drafts one from the name
+// in the background, so ask again (getBot) until it's there.
+export async function createBot(name: string): Promise<Bot & { drafting: boolean }> {
   return expectJson(await postJson("/api/bots", { name }));
 }
 
@@ -200,7 +203,7 @@ export async function getBot(id: string): Promise<{ bot: Bot; roster: BotRoster 
   return expectJson(await apiFetch(`/api/bots/${id}`));
 }
 
-export async function saveBot(id: string, patch: { name?: string; soul?: string; model?: string | null }): Promise<Bot> {
+export async function saveBot(id: string, patch: { name?: string; soul?: string; model?: string | null; guarded?: boolean }): Promise<Bot> {
   return expectJson(await postJson(`/api/bots/${id}`, patch, "PUT"));
 }
 

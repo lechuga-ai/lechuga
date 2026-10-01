@@ -14,6 +14,8 @@ type Props = {
   // My bots, Seed first. Each is a group in the list with its chats.
   bots: Bot[];
   onBotCreated: (bot: Bot) => void;
+  // Start chatting with a bot just made: its start page.
+  onBotStart: (bot: Bot) => void;
   // Who has a bot changed (the share dialog), so its faces follow.
   onBotPeople: (botId: string, people: Person[] | undefined) => void;
   activeChatId: string | null;
@@ -52,6 +54,7 @@ export function Sidebar({
   chats,
   bots,
   onBotCreated,
+  onBotStart,
   onBotPeople,
   activeChatId,
   open,
@@ -277,9 +280,10 @@ export function Sidebar({
         createPortal(
           <NewBotDialog
             onClose={() => setDialog("none")}
-            onCreated={(bot) => {
+            onCreated={onBotCreated}
+            onStart={(bot) => {
               setDialog("none");
-              onBotCreated(bot);
+              onBotStart(bot);
             }}
           />,
           document.body

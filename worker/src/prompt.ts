@@ -1,4 +1,5 @@
 import config from "../config.json";
+import { GUARDED_PROMPT } from "./guard";
 
 // The system message that opens every reply: who Lechuga is, what it can do
 // here, how it should be with people, and what it knows about the person
@@ -29,6 +30,9 @@ export type PromptOptions = {
   notes?: string | null;
   // Several people are taking part in the chat.
   shared?: boolean;
+  // The bot is guarded (guard.ts): the locked section goes last, after the
+  // soul, so it has the final word.
+  guarded?: boolean;
   now?: Date;
 };
 
@@ -48,6 +52,7 @@ export function systemPrompt(opts: PromptOptions = {}): string {
   if (bot.soul.trim()) sections.push(`How ${bot.name}'s owner has asked it to be, which is how you should be here. Follow it for what you focus on and for tone, length and manner; it doesn't override anything above about honesty.\n${bot.soul.trim()}`);
   if (opts.notes?.trim()) sections.push(`What you remember about this person from earlier chats. Use it when it helps; don't recite it, and don't bring up something from it unless it's relevant.\n${opts.notes.trim()}`);
   if (opts.shared) sections.push(SHARED);
+  if (opts.guarded) sections.push(GUARDED_PROMPT);
   return sections.join("\n\n");
 }
 

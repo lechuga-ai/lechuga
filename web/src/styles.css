@@ -393,20 +393,171 @@ button {
   box-shadow: 0 0 0 3px rgba(111, 174, 59, 0.18);
 }
 
+.bot-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.bot-panel-head .avatar {
+  font-size: 17px;
+}
+
 .bot-panel-title {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.doc-inner .settings-panel p.bot-panel-status {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+}
+
+/* The form: name and model side by side where there's room, edges on
+   every box so it reads as a form, the guard as one line with its
+   explanation folded away. */
+.bot-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 640px) {
+  .bot-form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.bot-form input:not([type="checkbox"]),
+.bot-form select,
+.bot-form textarea {
+  width: 100%;
+  max-width: none;
+  border-color: rgba(0, 0, 0, 0.16);
+  background: #fbfcfa;
+}
+
+.bot-form input:focus,
+.bot-form select:focus,
+.bot-form textarea:focus {
+  background: #fff;
+}
+
+.bot-form .settings-count {
+  margin-top: 6px;
+}
+
+.bot-guard {
+  margin: 4px 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f6f8f3;
+}
+
+.bot-guard .settings-check {
+  margin: 0;
+}
+
+.bot-details summary {
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--box-dim);
+}
+
+.bot-details summary:hover {
+  color: var(--box-text);
+}
+
+.bot-guard .bot-details {
+  margin-top: 6px;
+}
+
+.doc-inner .settings-panel .bot-details p {
+  margin: 8px 0 0;
+  font-size: 13px;
+}
+
+.bot-form-actions {
+  gap: 14px;
+}
+
+.bot-form-actions .bot-delete {
+  margin-left: auto;
+}
+
+.bot-sharing {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.bot-sharing summary {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--box-text);
+}
+
+.bot-sharing .bot-share {
+  margin-top: 10px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.bot-sharing .bot-share-title {
+  display: none;
+}
+
+.doc-inner .settings-lead {
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--box-dim);
+  margin: 0 0 16px;
+}
+
+/* The new-bot dialog's second step. */
+.new-bot-modal {
+  width: min(520px, 100%);
+}
+
+.new-bot-title {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 0 14px;
-  font-family: var(--sans);
-  font-size: 17px;
-  font-weight: 600;
 }
 
-.bot-panel-note {
-  font-size: 12px;
-  font-weight: 400;
+.modal p.new-bot-soul-label,
+.modal p.new-bot-drafting,
+.modal p.new-bot-tune {
+  font-size: 13.5px;
+}
+
+.modal p.new-bot-drafting {
   color: var(--box-dim);
+  font-style: italic;
+}
+
+.modal .new-bot-guard {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+.modal .new-bot-guard input {
+  width: auto;
+  margin-top: 3px;
 }
 
 /* Sharing, at the foot of a bot's panel. */

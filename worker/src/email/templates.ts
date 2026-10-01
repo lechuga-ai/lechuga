@@ -121,6 +121,23 @@ export function botSharedEmail(opts: { sharerName: string; botName: string; url:
   };
 }
 
+// To a guarded bot's owner when the check caught something. Says what kind
+// and where, never what was said: the chat is where the words are.
+export function guardAlertEmail(opts: { botName: string; personName: string; category: "self_harm" | "violence" | "explicit"; url: string }): EmailContent {
+  const what = opts.category === "self_harm" ? "hurting themselves" : opts.category === "violence" ? "weapons or hurting someone" : "something explicit";
+  return {
+    subject: `${opts.botName}: a message to look at`,
+    text: [
+      `${opts.personName} said something to ${opts.botName} that touched on ${what}. ${opts.botName} didn't answer it; it told them to talk to a trusted adult, and that you'd be told.`,
+      "",
+      "The chat is here:",
+      opts.url,
+      "",
+      "Nothing they said is in this email. It may be nothing; it may be worth a conversation.",
+    ].join("\n"),
+  };
+}
+
 export function requestReceivedEmail(): EmailContent {
   return {
     subject: "We got your request",

@@ -95,6 +95,9 @@ export type BotRow = {
   soul: string;
   model: string | null;
   is_default: number;
+  // 1: the guard is on (guard.ts): locked prompt, a check on every message,
+  // no tools, low effort raised. The owner's switch.
+  guarded: number;
   created_at: number;
   updated_at: number;
 };
