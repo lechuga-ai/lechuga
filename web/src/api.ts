@@ -189,6 +189,11 @@ export async function resetSeatCode(botId: string, userId: string, code?: string
   return expectJson(await postJson(`/api/bots/${botId}/seats/${userId}/code`, { code }));
 }
 
+// A seat becomes a full account with this email address.
+export async function upgradeSeat(botId: string, userId: string, email: string): Promise<{ roster: BotRoster }> {
+  return expectJson(await postJson(`/api/bots/${botId}/seats/${userId}/upgrade`, { email }));
+}
+
 export async function deleteSeat(botId: string, userId: string): Promise<{ roster: BotRoster }> {
   return expectJson(await apiFetch(`/api/bots/${botId}/seats/${userId}`, { method: "DELETE" }));
 }

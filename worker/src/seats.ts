@@ -4,6 +4,10 @@ import type { AppEnv, Env } from "./types";
 import { botAccess, botRoster } from "./bots";
 import { checkUsernameFormat, normalizeUsername } from "./username";
 import { seatEmail } from "./seat-email";
+import { hasAccount, normalizeEmail } from "./invites";
+import { applyOnce } from "./credits";
+import { sendEmail } from "./email";
+import { seatUpgradedEmail } from "./email/templates";
 import config from "../config.json";
 
 // Seats (migration 0016): an account for someone with no email address,
@@ -111,6 +115,38 @@ seats.post("/:id/seats/:userId/code", async (c) => {
     c.env.DB.prepare("DELETE FROM session WHERE userId = ?").bind(seatId),
   ]);
   return c.json({ username: seat.username, code });
+});
+
+// A seat becomes a full account: the owner gives it an email address, and
+// from then on it's an account like any other. It keeps its username, its
+// chats and its place in the bot (as an ordinary member now), gains the
+// starter credits and invites a new account gets, and stops being the
+// owner's to answer for. The code keeps working until they choose not to
+// use it; sign-in by email works as soon as they ask for a link.
+seats.post("/:id/seats/:userId/upgrade", async (c) => {
+  const userId = c.get("userId");
+  const access = await botAccess(c.env, c.req.param("id"), userId);
+  if (!access || access.role !== "owner") return c.json({ error: "not found" }, 404);
+  const seatId = c.req.param("userId");
+  const seat = await c.env.DB.prepare("SELECT username FROM user WHERE id = ? AND seat_of = ?").bind(seatId, userId).first<{ username: string }>();
+  if (!seat) return c.json({ error: "not found" }, 404);
+  const body = await c.req.json().catch(() => ({}));
+  const email = normalizeEmail(body?.email);
+  if (!email) return c.json({ error: "that doesn't look like an email address" }, 400);
+  if (await hasAccount(c.env, email)) return c.json({ error: "that address already has an account" }, 409);
+
+  await c.env.DB.prepare("UPDATE user SET email = ?, emailVerified = 0, seat_of = NULL, invites_remaining = ?, updatedAt = ? WHERE id = ?")
+    .bind(email, config.default_invites, new Date().toISOString(), seatId)
+    .run();
+  // Keyed by user id, so it lands once even if this is somehow repeated.
+  await applyOnce(c.env, { userId: seatId, delta: config.starter_credits, reason: "signup_bonus", ref: seatId });
+  const sharerName = c.get("username") ? `@${c.get("username")}` : c.get("userName") || "Someone";
+  c.executionCtx.waitUntil(
+    sendEmail(c.env, { to: email, ...seatUpgradedEmail({ sharerName, username: seat.username, url: `${c.env.BASE_URL}/`, termsUrl: `${c.env.BASE_URL}/terms` }) }).catch((err) =>
+      console.error("upgrade email failed", err)
+    )
+  );
+  return c.json({ roster: await botRoster(c.env, access.bot, true) });
 });
 
 // Gone for good: the account, its sessions, its place in the bot, and the

@@ -111,7 +111,7 @@ const NEWS: NewsEntry[] = [
       },
       {
         lead: "An account for someone without an email.",
-        text: "In a bot's sharing, make them a username and a code instead. It's an account of its own, for that bot only: no credits, no invites, no bots of its own, and you can read every chat it has, hand out a new code, or delete it. They sign in at the usual place with \"I have a username and a code\".",
+        text: "In a bot's sharing, make them a username and a code instead. It's an account of its own, for that bot only: no credits, no invites, no bots of its own, and you can read every chat it has, hand out a new code, or remove it. They sign in at the usual place with \"I have a username and a code\". When the time comes, give it an email address and it becomes a full account, theirs.",
       },
       {
         lead: "Three dots beside a bot's name.",

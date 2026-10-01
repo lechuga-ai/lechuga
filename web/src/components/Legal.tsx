@@ -59,7 +59,9 @@ export function Legal({ page }: Props) {
               An account holder can make an account for someone who has no email address, tied to one of their bots:
               a username and a code to sign in with. The holder answers for that account as if it were their own: they
               choose who it's for, they can read every chat it has, and they can change its code or delete it at any
-              time. Such an account can only chat with the bots it has been given.
+              time. Such an account can only chat with the bots it has been given. The holder can also make it a full
+              account by giving it an email address, after which it is the account of whoever holds that address, with
+              everything a full account has, and no longer the holder's to answer for.
             </p>
 
             <h2>Credits and payment</h2>

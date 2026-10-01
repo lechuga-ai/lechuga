@@ -12,6 +12,7 @@ import {
   removeBotMember,
   resetSeatCode,
   saveBot,
+  upgradeSeat,
   type Bot,
   type BotRoster,
   type Me,
@@ -225,9 +226,23 @@ export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (peop
   const [needsInvite, setNeedsInvite] = useState<{ email: string; remaining: number } | null>(null);
   // Three screens, one at a time: the share panel; the box for someone
   // without an email; and the username and code to hand over, shown once.
-  const [mode, setMode] = useState<"share" | "seat" | "code">("share");
+  const [mode, setMode] = useState<"share" | "seat" | "code" | "upgrade">("share");
   const [seatUser, setSeatUser] = useState("");
   const [handOver, setHandOver] = useState<{ username: string; code: string } | null>(null);
+  // The seat being made a full account, and the email it's given.
+  const [upgrading, setUpgrading] = useState<{ id: string; name: string } | null>(null);
+  const [upgradeEmail, setUpgradeEmail] = useState("");
+
+  async function upgrade(e: FormEvent) {
+    e.preventDefault();
+    if (!upgrading || !upgradeEmail.trim() || busy) return;
+    const who = upgrading;
+    if (await run(() => upgradeSeat(bot.id, who.id, upgradeEmail.trim()), `${who.name} is a full account now. We've emailed ${upgradeEmail.trim()} to say so.`)) {
+      setUpgrading(null);
+      setUpgradeEmail("");
+      setMode("share");
+    }
+  }
 
   useEffect(() => {
     getBot(bot.id)
@@ -342,6 +357,49 @@ export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (peop
     );
   }
 
+  if (mode === "upgrade" && upgrading) {
+    return (
+      <div className="bot-share">
+        <h3 className="bot-share-title">Share {bot.name}</h3>
+        <form onSubmit={upgrade} className="bot-seat-form">
+          <p>
+            Make {upgrading.name} a full account. Give it their email address: from then on they can sign in with it (the username and code keep
+            working too), they get their own credits and invites, they stay in {bot.name} like anyone you've shared it with, and the account stops
+            being yours to answer for. We'll email them to say so.
+          </p>
+          <div className="bot-seat-fields">
+            <input
+              autoFocus
+              type="email"
+              placeholder="their email address"
+              autoCapitalize="none"
+              spellCheck={false}
+              value={upgradeEmail}
+              onChange={(e) => setUpgradeEmail(e.target.value)}
+              disabled={busy}
+            />
+          </div>
+          {error && <p className="modal-error">{error}</p>}
+          <div className="modal-actions">
+            <button
+              type="button"
+              onClick={() => {
+                setUpgrading(null);
+                setMode("share");
+              }}
+              disabled={busy}
+            >
+              Back
+            </button>
+            <button type="submit" className="primary" disabled={busy || !upgradeEmail.trim()}>
+              {busy ? "making…" : "Make it a full account"}
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
   if (mode === "seat") {
     return (
       <div className="bot-share">
@@ -448,9 +506,23 @@ export function BotShare({ bot, onPeople, onClose }: { bot: Bot; onPeople: (peop
                 {p.seat && <span className="share-state"> · username and code</span>}
               </span>
               {p.seat && (
-                <button type="button" className="signin-link" disabled={busy} onClick={() => void newCode(p.id)}>
-                  new code
-                </button>
+                <>
+                  <button type="button" className="signin-link" disabled={busy} onClick={() => void newCode(p.id)}>
+                    new code
+                  </button>
+                  <button
+                    type="button"
+                    className="signin-link"
+                    disabled={busy}
+                    onClick={() => {
+                      setError(null);
+                      setUpgrading({ id: p.id, name: p.name });
+                      setMode("upgrade");
+                    }}
+                  >
+                    full account
+                  </button>
+                </>
               )}
               <button
                 type="button"
