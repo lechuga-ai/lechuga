@@ -342,6 +342,7 @@
     "compact_offer_tokens": 8000,
     "public_requests_per_day": 200,
     "chat_members": 10,
+    "seats_per_account": 5,
     "avatar_chars": 60000,
     "max_manual_grant": 1000000
   },

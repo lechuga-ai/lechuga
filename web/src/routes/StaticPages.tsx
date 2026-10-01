@@ -110,6 +110,10 @@ const NEWS: NewsEntry[] = [
         text: "A switch on a bot in Bot Manager. On, the bot keeps everything it says suitable for a young person, however a request is framed, and can't search the web. Every message is checked before the bot sees it: if someone brings up hurting themselves or others, or weapons, the bot stops, tells them to talk to a trusted adult, and emails the bot's owner; explicit requests are simply refused. Anyone the bot is shared with is told it's guarded.",
       },
       {
+        lead: "An account for someone without an email.",
+        text: "In a bot's sharing, make them a username and a code instead. It's an account of its own, for that bot only: no credits, no invites, no bots of its own, and you can read every chat it has, hand out a new code, or delete it. They sign in at the usual place with \"I have a username and a code\".",
+      },
+      {
         lead: "Three dots beside a bot's name.",
         text: "New chat starts one with that bot. Bot Manager is a page under Account with every bot on it: its name, the model its new chats start on, and how it behaves, which you can rewrite from scratch. From the dots it lands on that bot.",
       },

@@ -36,6 +36,8 @@ me.get("/", async (c) => {
     // False where credits can't be bought yet; the UI then hides the buy buttons.
     creditsEnforced: creditsEnforced(c.env),
     isAdmin: c.get("isAdmin"),
+    // Someone else's account for one bot (seats.ts): the app shows less.
+    seat: c.get("seatOf") !== null,
   });
 });
 

@@ -255,14 +255,16 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   const carried = sinceLastSummary(messages).reduce((n, m) => n + estimateMessageTokens(m.content), 0);
   const rate = models.find((m) => m.id === chatModel)?.credit_per_million_prompt_tokens ?? 0;
   const carriedCredits = Math.ceil((carried * rate) / 1_000_000);
-  // Compacting spends the owner's credits, so it's only offered to them.
+  // Compacting spends the payer's credits, so it's only offered to them: in
+  // someone else's bot the payer is its owner, so not there.
   const offerCompact =
-    role === "owner" && carried >= config.limits.compact_offer_tokens && streamingText === null && sinceLastSummary(messages).length >= 3;
+    role === "owner" && !botOwner && carried >= config.limits.compact_offer_tokens && streamingText === null && sinceLastSummary(messages).length >= 3;
 
   // Remember: Lechuga folds this chat into what it keeps about you (Account >
   // Memory). Only in a chat nobody else has ever been in, since the memory
   // is yours alone; the server holds the same line. Costs about a message.
-  const canRemember = role === "owner" && !isShared && (roster?.members.length ?? 0) === 0 && messages.length >= 2 && streamingText === null && !compacting;
+  const canRemember =
+    role === "owner" && !isShared && !botOwner && (roster?.members.length ?? 0) === 0 && messages.length >= 2 && streamingText === null && !compacting;
 
   async function remember() {
     setRemembering(true);

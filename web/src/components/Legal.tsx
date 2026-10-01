@@ -54,6 +54,14 @@ export function Legal({ page }: Props) {
               else's private information into one, and don't share one with somebody it wasn't meant for.
             </p>
 
+            <h2>Accounts made for someone else</h2>
+            <p>
+              An account holder can make an account for someone who has no email address, tied to one of their bots:
+              a username and a code to sign in with. The holder answers for that account as if it were their own: they
+              choose who it's for, they can read every chat it has, and they can change its code or delete it at any
+              time. Such an account can only chat with the bots it has been given.
+            </p>
+
             <h2>Credits and payment</h2>
             <p>
               Credits you buy pay for the models that answer you. What a reply cost is shown under it. Credits don't
@@ -138,6 +146,16 @@ export function Legal({ page }: Props) {
               pictures in it. So share one only with people you'd show all of it to. The person who started the chat
               can remove someone at any time, which takes the chat away from them; what they wrote stays in it, under
               their name, for the people still there. If the person who started it deletes it, it goes for everyone.
+            </p>
+
+            <h2>Accounts made for someone else</h2>
+            <p>
+              An account holder can make an account for someone without an email address (a username and a code),
+              tied to one of their bots. We keep for it only what we keep for any account, minus the email: a name, the
+              username, the sign-in code (stored hashed, like a password), and its chats. The holder who made it can
+              read every one of those chats, can change the code, and can delete the account, which deletes its
+              sessions and its place in the bot. Nothing it says is kept as memory, and nothing about the holder is
+              shown to it. The holder is responsible for having the right to set it up for the person who uses it.
             </p>
 
             <h2>The free chat on the home page</h2>

@@ -1,6 +1,23 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
-import { ApiError, addBotMember, cancelBotPendingShare, deleteBot, getBot, listModels, removeBotMember, saveBot, type Bot, type BotRoster, type Me, type Model } from "../api";
+import {
+  ApiError,
+  addBotMember,
+  cancelBotPendingShare,
+  createSeat,
+  deleteBot,
+  deleteSeat,
+  getBot,
+  listModels,
+  removeBotMember,
+  resetSeatCode,
+  saveBot,
+  type Bot,
+  type BotRoster,
+  type Me,
+  type Model,
+} from "../api";
+import { SEAT_DOMAIN } from "../../../worker/src/seat-email";
 import { Avatar } from "./Avatar";
 import type { Person } from "../api";
 import config from "../../../worker/config.json";
@@ -205,12 +222,50 @@ export function BotShare({ bot, onPeople }: { bot: Bot; onPeople: (people: Perso
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [needsInvite, setNeedsInvite] = useState<{ email: string; remaining: number } | null>(null);
+  // Someone without an email: the form, and the code to hand over, shown once.
+  const [seatForm, setSeatForm] = useState(false);
+  const [seatName, setSeatName] = useState("");
+  const [seatUser, setSeatUser] = useState("");
+  const [handOver, setHandOver] = useState<{ username: string; code: string } | null>(null);
 
   useEffect(() => {
     getBot(bot.id)
       .then((r) => setRoster(r.roster))
       .catch(() => setError("couldn't load who has this bot"));
   }, [bot.id]);
+
+  async function addSeat(e: FormEvent) {
+    e.preventDefault();
+    if (!seatName.trim() || !seatUser.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    try {
+      const made = await createSeat(bot.id, { name: seatName.trim(), username: seatUser.trim().replace(/^@/, "") });
+      took(made.roster);
+      setHandOver({ username: made.seat.username, code: made.code });
+      setSeatForm(false);
+      setSeatName("");
+      setSeatUser("");
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function newCode(userId: string) {
+    if (!window.confirm("Hand out a new code? The old one stops working, and any device signed in with it is signed out.")) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setHandOver(await resetSeatCode(bot.id, userId));
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   function took(r: BotRoster) {
     setRoster(r);
@@ -291,6 +346,63 @@ export function BotShare({ bot, onPeople }: { bot: Bot; onPeople: (people: Perso
           </button>
         </form>
       )}
+      {!needsInvite && !seatForm && (
+        <p className="bot-seat-offer">
+          Someone without an email address?{" "}
+          <button type="button" className="signin-link" onClick={() => setSeatForm(true)} disabled={busy}>
+            make them a username and a code
+          </button>
+        </p>
+      )}
+      {seatForm && (
+        <form onSubmit={addSeat} className="bot-seat-form">
+          <p>
+            An account of its own for this bot only, with no email: you choose the name and username, Lechuga gives you a code to hand over, and
+            they sign in with those. It can't buy credits, make bots, or be shared with; what it says to {bot.name} is yours to read, like any
+            chat with a bot you share. You can hand out a new code or delete the account at any time.
+          </p>
+          <div className="bot-seat-fields">
+            <input placeholder="Their name" maxLength={60} value={seatName} onChange={(e) => setSeatName(e.target.value)} disabled={busy} />
+            <input
+              placeholder="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              maxLength={20}
+              value={seatUser}
+              onChange={(e) => setSeatUser(e.target.value)}
+              disabled={busy}
+            />
+          </div>
+          <div className="modal-actions">
+            <button type="button" onClick={() => setSeatForm(false)} disabled={busy}>
+              Cancel
+            </button>
+            <button type="submit" className="primary" disabled={busy || !seatName.trim() || !seatUser.trim()}>
+              {busy ? "making…" : "Make the account"}
+            </button>
+          </div>
+        </form>
+      )}
+      {handOver && (
+        <div className="bot-seat-code">
+          <p>Hand these over. The code is shown this once; if it's lost, hand out a new one from the list below.</p>
+          <p className="bot-seat-pair">
+            <span>
+              username <b>{handOver.username}</b>
+            </span>
+            <span>
+              code <b>{handOver.code}</b>
+            </span>
+          </p>
+          <p className="settings-count">
+            They sign in at the usual place with "I have a username and a code". (Not an email address, though it's stored as {handOver.username}@
+            {SEAT_DOMAIN}, which gets no mail.)
+          </p>
+          <button type="button" className="signin-link" onClick={() => setHandOver(null)}>
+            got it
+          </button>
+        </div>
+      )}
       {done && <p className="modal-ok">{done}</p>}
       {error && <p className="modal-error">{error}</p>}
       {roster && (active.length > 0 || roster.pending.length > 0 || removed.length > 0) && (
@@ -301,14 +413,28 @@ export function BotShare({ bot, onPeople }: { bot: Bot; onPeople: (people: Perso
               <span className="share-name">
                 {p.name}
                 {p.username && p.name !== `@${p.username}` && <span className="share-handle"> @{p.username}</span>}
+                {p.seat && <span className="share-state"> · username and code</span>}
               </span>
+              {p.seat && (
+                <button type="button" className="signin-link" disabled={busy} onClick={() => void newCode(p.id)}>
+                  new code
+                </button>
+              )}
               <button
                 type="button"
                 className="signin-link"
                 disabled={busy}
-                onClick={() => void run(() => removeBotMember(bot.id, p.id), `${p.name} no longer has this bot. Their chats with it stay with you.`)}
+                onClick={() => {
+                  if (p.seat) {
+                    if (window.confirm(`Delete ${p.name}'s account? They won't be able to sign in. Their chats with ${bot.name} stay with you.`)) {
+                      void run(() => deleteSeat(bot.id, p.id), `${p.name}'s account is gone.`);
+                    }
+                  } else {
+                    void run(() => removeBotMember(bot.id, p.id), `${p.name} no longer has this bot. Their chats with it stay with you.`);
+                  }
+                }}
               >
-                remove
+                {p.seat ? "delete" : "remove"}
               </button>
             </li>
           ))}
@@ -392,11 +518,14 @@ function SharedBotPanel({ me, bot, highlighted, onLeft }: { me: Me; bot: Bot; hi
         </>
       )}
       {error && <p className="modal-error">{error}</p>}
-      <div className="modal-actions">
-        <button type="button" className="signin-link" onClick={leave} disabled={busy}>
-          leave this bot
-        </button>
-      </div>
+      {/* A seat exists for this bot; the way out is the owner's. */}
+      {!me.seat && (
+        <div className="modal-actions">
+          <button type="button" className="signin-link" onClick={leave} disabled={busy}>
+            leave this bot
+          </button>
+        </div>
+      )}
     </section>
   );
 }

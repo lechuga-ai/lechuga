@@ -36,15 +36,17 @@ export type BotView = BotRow & { role: BotRole; people?: Person[] };
 
 export type BotRoster = {
   owner: Person;
-  members: (Person & { removed: boolean })[];
+  // seat: an account the owner made for someone without an email (seats.ts).
+  members: (Person & { removed: boolean; seat: boolean })[];
   pending: { id: string; email: string }[];
 };
 
 const GONE = (id: string): Person => ({ id, name: "someone who left", username: null, photo: null });
 
-// Mine, Seed first, then the ones shared with me.
-export async function listBots(env: Env, userId: string): Promise<BotView[]> {
-  await defaultBot(env, userId);
+// Mine, Seed first, then the ones shared with me. A seat (seats.ts) has no
+// bots of its own, not even Seed: only what's shared with it.
+export async function listBots(env: Env, userId: string, seat = false): Promise<BotView[]> {
+  if (!seat) await defaultBot(env, userId);
   const [{ results: mine }, { results: shared }, { results: memberRows }] = await Promise.all([
     env.DB.prepare("SELECT * FROM bots WHERE user_id = ? ORDER BY is_default DESC, created_at ASC").bind(userId).all<BotRow>(),
     env.DB.prepare(
@@ -109,7 +111,11 @@ export async function botAccess(env: Env, botId: string, userId: string): Promis
 
 export async function botRoster(env: Env, bot: BotRow, forOwner: boolean): Promise<BotRoster> {
   const [{ results: rows }, { results: pending }] = await Promise.all([
-    env.DB.prepare("SELECT user_id, removed_at FROM bot_members WHERE bot_id = ? ORDER BY added_at ASC").bind(bot.id).all<{ user_id: string; removed_at: number | null }>(),
+    env.DB.prepare(
+      "SELECT m.user_id, m.removed_at, u.seat_of FROM bot_members m LEFT JOIN user u ON u.id = m.user_id WHERE m.bot_id = ? ORDER BY m.added_at ASC"
+    )
+      .bind(bot.id)
+      .all<{ user_id: string; removed_at: number | null; seat_of: string | null }>(),
     forOwner
       ? env.DB.prepare("SELECT id, email FROM bot_pending_shares WHERE bot_id = ? ORDER BY created_at ASC").bind(bot.id).all<{ id: string; email: string }>()
       : Promise.resolve({ results: [] as { id: string; email: string }[] }),
@@ -117,7 +123,7 @@ export async function botRoster(env: Env, bot: BotRow, forOwner: boolean): Promi
   const people = await peopleByIds(env, [bot.user_id, ...rows.map((r) => r.user_id)]);
   return {
     owner: people.get(bot.user_id) ?? GONE(bot.user_id),
-    members: rows.map((r) => ({ ...(people.get(r.user_id) ?? GONE(r.user_id)), removed: r.removed_at !== null })),
+    members: rows.map((r) => ({ ...(people.get(r.user_id) ?? GONE(r.user_id)), removed: r.removed_at !== null, seat: r.seat_of !== null })),
     pending,
   };
 }
@@ -173,7 +179,7 @@ function cleanName(raw: unknown): string | null {
 // Runs after the session check in index.ts.
 export const bots = new Hono<AppEnv>();
 
-bots.get("/", async (c) => c.json(await listBots(c.env, c.get("userId"))));
+bots.get("/", async (c) => c.json(await listBots(c.env, c.get("userId"), c.get("seatOf") !== null)));
 
 bots.post("/", async (c) => {
   const body = await c.req.json().catch(() => ({}));

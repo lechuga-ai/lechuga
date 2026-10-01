@@ -134,7 +134,10 @@ chat.get("/chats/search", async (c) => {
 chat.post("/chats", async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const userId = c.get("userId");
-  const bot = (typeof body?.bot === "string" && (await botAccess(c.env, body.bot, userId))?.bot) || (await defaultBot(c.env, userId));
+  const shared = typeof body?.bot === "string" ? (await botAccess(c.env, body.bot, userId))?.bot : null;
+  // A seat has no Seed to fall back on: only a bot it's been let into.
+  if (!shared && c.get("seatOf")) return c.json({ error: "this account can only chat with the bots shared with it" }, 403);
+  const bot = shared || (await defaultBot(c.env, userId));
   const model = MODEL_IDS.has(body?.model) ? body.model : bot.model && MODEL_IDS.has(bot.model) ? bot.model : DEFAULT_MODEL;
 
   const id = crypto.randomUUID();

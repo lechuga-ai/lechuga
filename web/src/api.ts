@@ -170,9 +170,28 @@ export type Bot = {
 
 export type BotRoster = {
   owner: Person;
-  members: (Person & { removed: boolean })[];
+  // seat: an account the owner made for someone without an email.
+  members: (Person & { removed: boolean; seat: boolean })[];
   pending: { id: string; email: string }[];
 };
+
+// Seats (worker/src/seats.ts): an account for someone without an email,
+// tied to one bot, signing in with a username and a code. The code comes
+// back once, here and from resetSeatCode; it's stored hashed.
+export async function createSeat(
+  botId: string,
+  seat: { name: string; username: string; code?: string }
+): Promise<{ roster: BotRoster; seat: { id: string; username: string; name: string }; code: string }> {
+  return expectJson(await postJson(`/api/bots/${botId}/seats`, seat));
+}
+
+export async function resetSeatCode(botId: string, userId: string, code?: string): Promise<{ username: string; code: string }> {
+  return expectJson(await postJson(`/api/bots/${botId}/seats/${userId}/code`, { code }));
+}
+
+export async function deleteSeat(botId: string, userId: string): Promise<{ roster: BotRoster }> {
+  return expectJson(await apiFetch(`/api/bots/${botId}/seats/${userId}`, { method: "DELETE" }));
+}
 
 export async function listBots(): Promise<Bot[]> {
   return expectJson(await apiFetch("/api/bots"));
@@ -333,6 +352,9 @@ export type Me = {
   // but nobody is stopped at zero.
   creditsEnforced: boolean;
   isAdmin: boolean;
+  // Someone else's account for one bot (worker/src/seats.ts): no credits,
+  // invites, memory or bots of its own.
+  seat: boolean;
 };
 
 export async function getMe(): Promise<Me> {

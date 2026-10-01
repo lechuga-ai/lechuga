@@ -4,10 +4,12 @@ import { authClient } from "../auth";
 import { isInstalledApp } from "../installed";
 import { NATIVE } from "../native";
 import { getAuthConfig, lookupInvite, requestAccess, type AuthConfig } from "../api";
+import { seatEmail } from "../../../worker/src/seat-email";
 
 // sent: a link is on its way (browser). code: a code is, and there is a field
-// for it (installed app).
-type View = "signin" | "sent" | "code" | "invite-only" | "requested";
+// for it (installed app). seat: a username and a code, for an account made
+// for someone without an email (worker/src/seats.ts).
+type View = "signin" | "sent" | "code" | "invite-only" | "requested" | "seat";
 
 type CardProps = {
   // Where Better Auth sends the user after the magic link or Google
@@ -40,6 +42,8 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
   const [view, setView] = useState<View>(startOnRequest ? "invite-only" : "signin");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  const [seatName, setSeatName] = useState("");
+  const [seatCode, setSeatCode] = useState("");
   const [emailLocked, setEmailLocked] = useState(false);
   const [inviteNote, setInviteNote] = useState<string | null>(null);
   const [reason, setReason] = useState("");
@@ -205,6 +209,35 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
     window.location.assign(callbackURL);
   }
 
+  // A seat's sign-in: the username as a made-up address, the code as the
+  // password, through Better Auth's ordinary sign-in. Behind the bot check.
+  async function signInSeat(e: FormEvent) {
+    e.preventDefault();
+    const username = seatName.trim().replace(/^@/, "");
+    if (!username || !seatCode.trim()) return;
+    const token = needCaptcha();
+    if (token === null) return;
+    setBusy(true);
+    setError(null);
+    let err: { code?: string; message?: string } | null;
+    try {
+      ({ error: err } = await authClient.signIn.email({
+        email: seatEmail(username),
+        password: seatCode.trim(),
+        fetchOptions: { headers: { "x-captcha-response": token } },
+      }));
+    } catch (thrown) {
+      err = { message: (thrown as Error).message || String(thrown) };
+    }
+    if (err) {
+      setBusy(false);
+      resetCaptcha();
+      setError(err.code === "INVALID_EMAIL_OR_PASSWORD" ? "that username and code don't match" : err.message || "couldn't sign you in, try again");
+      return;
+    }
+    window.location.assign(callbackURL);
+  }
+
   async function signInWithGoogle() {
     setError(null);
     const { error: err } = await authClient.signIn.social({ provider: "google", callbackURL, errorCallbackURL: "/" });
@@ -230,7 +263,7 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
     }
   }
 
-  const showWidget = !NATIVE && (view === "signin" || view === "invite-only");
+  const showWidget = !NATIVE && (view === "signin" || view === "invite-only" || view === "seat");
 
   return (
     <div className="signin">
@@ -344,7 +377,59 @@ export function SignInCard({ callbackURL, inviteToken = null, startOnRequest = f
             <button type="button" className="signin-link" onClick={() => setView("invite-only")}>
               request access
             </button>
+            {!NATIVE && (
+              <>
+                {" · "}
+                <button type="button" className="signin-link" onClick={() => setView("seat")}>
+                  I have a username and a code
+                </button>
+              </>
+            )}
           </p>
+        </form>
+      )}
+
+      {view === "seat" && (
+        <form className="signin-form" onSubmit={signInSeat}>
+          <p className="signin-lead">If someone set Lechuga up for you, they gave you a username and a code.</p>
+          <label className="signin-label" htmlFor="seat-username">
+            Username
+          </label>
+          <input
+            id="seat-username"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+            placeholder="username"
+            value={seatName}
+            onChange={(e) => setSeatName(e.target.value)}
+            disabled={busy}
+            className="signin-input"
+          />
+          <label className="signin-label" htmlFor="seat-code">
+            Code
+          </label>
+          <input
+            id="seat-code"
+            type="password"
+            autoComplete="current-password"
+            inputMode="numeric"
+            required
+            placeholder="the code"
+            value={seatCode}
+            onChange={(e) => setSeatCode(e.target.value)}
+            disabled={busy}
+            className="signin-input"
+          />
+          <div className="signin-row signin-actions">
+            <button type="button" className="signin-google" onClick={() => setView("signin")} disabled={busy}>
+              back
+            </button>
+            <button type="submit" disabled={busy || !config || captchaBlocked}>
+              {busy ? "signing in…" : "sign in"}
+            </button>
+          </div>
         </form>
       )}
 
