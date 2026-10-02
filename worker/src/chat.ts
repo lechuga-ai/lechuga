@@ -96,7 +96,7 @@ chat.get("/chats/search", async (c) => {
   if (words.length === 0) return c.json([]);
   const userId = c.get("userId");
   const like = (w: string) => `%${w.replace(/[\\%_]/g, (ch) => "\\" + ch)}%`;
-  const clauses = words.map((_, i) => `lower(m.content) LIKE ?${i + 2} ESCAPE '\\'`).join(" AND ");
+  const clauses = words.map((_, i) => `lower(m.content) LIKE ?${i + 3} ESCAPE '\\'`).join(" AND ");
   // Mine, the ones shared with me, and (unless I'm a username-and-code
   // account) the public ones, which are everyone's to find.
   const seat = c.get("seatOf") !== null;
