@@ -694,12 +694,31 @@ button {
   letter-spacing: 0.04em;
 }
 
-/* Public, marked where the thing is: a ◎ before a chat's title or a bot's name. */
+/* Public, marked where the thing is: a ◎ where a chat's or a bot's faces
+   would go. The glyph itself is thin and easy to miss, so it's drawn here as
+   a solid ring with a dot, the size of a face; the ◎ stays in the markup for
+   copy and screen readers. */
 .public-mark {
-  color: #6fae3b;
-  font-size: 13px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  font-size: 0;
+  color: transparent;
   cursor: default;
+}
+
+.public-mark::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
 }
 
 /* The public page: bots, then chats. */
@@ -2600,6 +2619,9 @@ button {
   left: 0;
   right: 0;
   bottom: calc(100% - 4px);
+  /* Above the chat rows: the owner's face is raised to keep its ring whole
+     (.avatar-stack .avatar.owner), and without this it showed through. */
+  z-index: 5;
   display: flex;
   flex-direction: column;
   padding: 6px;
