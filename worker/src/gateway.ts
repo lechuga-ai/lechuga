@@ -1,6 +1,9 @@
 import type { Env } from "./types";
 import { parseSSE } from "./sse";
 import type { ContentPart } from "./attachments";
+import config from "../config.json";
+
+const LIMITS = config.limits;
 
 // content is a list of parts only when the turn carries pictures. The two
 // tool shapes are the model asking for a tool and the answer it gets back.
@@ -46,23 +49,37 @@ export async function streamChat(
 ): Promise<StreamResult> {
   const url = `https://gateway.ai.cloudflare.com/v1/${env.AI_GATEWAY_ACCOUNT_ID}/${env.AI_GATEWAY_ID}/workers-ai/v1/chat/completions`;
 
-  const upstream = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${env.CF_API_TOKEN}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      stream: true,
-      stream_options: { include_usage: true },
-      ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
-      // How much the model thinks before answering: low, medium or high.
-      ...(opts.effort ? { reasoning_effort: opts.effort } : {}),
-      ...(opts.tools?.length ? { tools: opts.tools, tool_choice: "auto" } : {}),
-    }),
-  });
+  // Two clocks, neither of which caps a long reply: one for the headers to
+  // arrive (the gateway is down or queueing), cleared as soon as they do,
+  // and one for the gaps between chunks (the model stalled mid-answer),
+  // which errors the stream so the readers see it instead of waiting for
+  // ever. A reply that thinks for minutes streams its reasoning the whole
+  // time, so the gap clock doesn't trouble it.
+  const abort = new AbortController();
+  const firstByte = setTimeout(() => abort.abort(new Error("the model took too long to start answering")), LIMITS.model_first_byte_ms);
+  let upstream: Response;
+  try {
+    upstream = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${env.CF_API_TOKEN}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+        stream_options: { include_usage: true },
+        ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
+        // How much the model thinks before answering: low, medium or high.
+        ...(opts.effort ? { reasoning_effort: opts.effort } : {}),
+        ...(opts.tools?.length ? { tools: opts.tools, tool_choice: "auto" } : {}),
+      }),
+      signal: abort.signal,
+    });
+  } finally {
+    clearTimeout(firstByte);
+  }
 
   if (!upstream.ok || !upstream.body) {
     throw new Error(`gateway request failed: ${upstream.status} ${await upstream.text()}`);
@@ -73,7 +90,7 @@ export async function streamChat(
     resolveUsage = res;
   });
 
-  const [forClient, forUsage] = upstream.body.tee();
+  const [forClient, forUsage] = withIdleTimeout(upstream.body, LIMITS.model_idle_ms).tee();
 
   (async () => {
     let found: Usage | null = null;
@@ -94,6 +111,29 @@ export async function streamChat(
   })();
 
   return { stream: forClient, usage };
+}
+
+// Errors the stream when nothing has arrived for `ms`. Downstream, parseSSE
+// throws, the reply loop sends {error}, and the usage reader resolves null
+// so the text that did arrive is charged by estimate rather than for free.
+function withIdleTimeout(source: ReadableStream<Uint8Array>, ms: number): ReadableStream<Uint8Array> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const stalled = () => new Error("the model stopped sending");
+  return source.pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      start(controller) {
+        timer = setTimeout(() => controller.error(stalled()), ms);
+      },
+      transform(chunk, controller) {
+        if (timer !== undefined) clearTimeout(timer);
+        controller.enqueue(chunk);
+        timer = setTimeout(() => controller.error(stalled()), ms);
+      },
+      flush() {
+        if (timer !== undefined) clearTimeout(timer);
+      },
+    })
+  );
 }
 
 // Re-encodes the upstream stream as our own SSE events for the browser:

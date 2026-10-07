@@ -114,8 +114,11 @@ export async function relatedPublic(env: Env, text: string, excludeChatId: strin
 }
 
 // The first answer in a public chat, cut short, for the model to lean on.
+// Only an answer the model wrote here (one that was charged): a reply the
+// chat's owner brought in from the home page's trial (chat.ts, import) is
+// text they typed, and doesn't get handed to other people's replies.
 export async function firstAnswer(env: Env, chatId: string): Promise<string | null> {
-  const row = await env.DB.prepare("SELECT content FROM messages WHERE chat_id = ? AND role = 'assistant' ORDER BY created_at ASC LIMIT 1")
+  const row = await env.DB.prepare("SELECT content FROM messages WHERE chat_id = ? AND role = 'assistant' AND credits IS NOT NULL ORDER BY created_at ASC LIMIT 1")
     .bind(chatId)
     .first<{ content: string }>();
   return row ? row.content.slice(0, PUBLIC.bring_in_chars) : null;
@@ -157,7 +160,7 @@ publicChats.get("/bots", async (c) => {
 publicChats.post("/bots/:id/public", async (c) => {
   const userId = c.get("userId");
   if (c.get("seatOf")) return c.json({ error: "not available on this account" }, 403);
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   if (access.role !== "owner") return c.json({ error: "only the bot's owner can make it public" }, 403);
   const bot = access.bot;
@@ -248,7 +251,10 @@ async function pointer(c: Context<AppEnv>, what: "chat" | "bot", title: string, 
     const email = normalizeEmail(who);
     if (!email) return c.json({ error: "that doesn't look like an email address" }, 400);
     target = await c.env.DB.prepare("SELECT id, email FROM user WHERE lower(email) = ? AND seat_of IS NULL").bind(email).first<{ id: string; email: string }>();
-    if (!target) return c.json({ error: "that address doesn't have a Lechuga account yet; invite them first, from the menu behind your name" }, 404);
+    // The same answer whether or not the address has an account, so this
+    // can't be used to find out who's on Lechuga. Nothing is sent to an
+    // address that isn't.
+    if (!target) return c.json({ ok: true, sentTo: who, unknown: true });
   } else {
     target = await c.env.DB.prepare("SELECT id, email FROM user WHERE lower(username) = ? AND seat_of IS NULL").bind(who.toLowerCase()).first<{ id: string; email: string }>();
     if (!target) return c.json({ error: `nobody here goes by @${who}` }, 404);
@@ -297,7 +303,7 @@ publicChats.post("/chats/:id/private", async (c) => {
 // people from the bot's sharing, or delete the chats.
 publicChats.post("/bots/:id/private", async (c) => {
   const userId = c.get("userId");
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   if (access.role !== "owner") return c.json({ error: "only the bot's owner can make it private" }, 403);
   const bot = access.bot;
@@ -322,7 +328,7 @@ publicChats.post("/bots/:id/private", async (c) => {
 publicChats.post("/chats/:id/public", async (c) => {
   const userId = c.get("userId");
   if (c.get("seatOf")) return c.json({ error: "not available on this account" }, 403);
-  const access = await chatAccess(c.env, c.req.param("id"), userId);
+  const access = await chatAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   const chat = access.chat;
   if (chat.user_id !== userId) return c.json({ error: "only the person who started a chat can make it public" }, 403);

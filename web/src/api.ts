@@ -148,6 +148,14 @@ export async function createChat(model?: string, bot?: string): Promise<{ id: st
   );
 }
 
+// A cheap poll for a chat with others in it: enough to tell whether anything
+// changed, so the whole chat (pictures and all) is only re-read when it did.
+export type ChatHead = { updated_at: number; messages: number; last_message_at: number | null; role: "owner" | "member" | "reader" };
+
+export async function getChatHead(id: string): Promise<ChatHead> {
+  return expectJson(await apiFetch(`/api/chats/${id}/head`));
+}
+
 // bot.owner is set when the chat is with someone else's bot: they can see it.
 export async function getChat(
   id: string
@@ -196,9 +204,11 @@ export async function resetSeatCode(botId: string, userId: string, code?: string
   return expectJson(await postJson(`/api/bots/${botId}/seats/${userId}/code`, { code }));
 }
 
-// A seat becomes a full account with this email address.
-export async function upgradeSeat(botId: string, userId: string, email: string): Promise<{ roster: BotRoster }> {
-  return expectJson(await postJson(`/api/bots/${botId}/seats/${userId}/upgrade`, { email }));
+// A seat becomes a full account with this email address. The address needs
+// an invite: one waiting for it, or (useInvite) one of the owner's; without
+// either this throws ApiError code needs_invite, like addChatMember.
+export async function upgradeSeat(botId: string, userId: string, email: string, useInvite = false): Promise<{ roster: BotRoster }> {
+  return expectJson(await postJson(`/api/bots/${botId}/seats/${userId}/upgrade`, { email, useInvite }));
 }
 
 export async function deleteSeat(botId: string, userId: string): Promise<{ roster: BotRoster }> {
@@ -302,9 +312,14 @@ export async function deleteChat(id: string): Promise<void> {
 
 export type Step = { id: string; label: string; links?: { title: string; url: string }[]; done: boolean };
 
+// What the worker stored and charged for the reply, sent as the last event
+// of the stream so the page can show the cost without re-reading the chat.
+export type StoredReply = { id: string; credits: number; prompt_tokens: number | null; completion_tokens: number | null; model: string };
+
 export type StreamHandlers = {
   onDelta: (text: string) => void;
   onReasoning?: (text: string) => void;
+  onStored?: (stored: StoredReply) => void;
   // A tool the model used: once when it starts, again when it's done.
   onStep?: (step: Step) => void;
   // The model went on to use a tool after starting to answer; what it said
@@ -318,33 +333,37 @@ export type StreamHandlers = {
   signal?: AbortSignal;
 };
 
-type StreamEvent = { delta?: string; reasoning?: string; notice?: string; error?: string; step?: Step; retract?: boolean; related?: { id: string; title: string | null }[] };
+type StreamEvent = {
+  delta?: string;
+  reasoning?: string;
+  notice?: string;
+  error?: string;
+  step?: Step;
+  retract?: boolean;
+  related?: { id: string; title: string | null }[];
+  stored?: StoredReply;
+};
 
 // Streams the assistant's reply. Resolves when the stream ends, or quietly
 // when aborted via signal (the server still finishes and stores the reply).
 // Throws on an HTTP error or an error event from the server.
-export async function sendMessage(
-  chatId: string,
-  content: string,
-  attachments: Attachment[],
-  { onDelta, onReasoning, onNotice, onStep, onRetract, onRelated, signal }: StreamHandlers
-): Promise<void> {
+export async function sendMessage(chatId: string, content: string, attachments: Attachment[], handlers: StreamHandlers): Promise<void> {
   let res: Response;
   try {
     res = await apiFetch(`/api/chats/${chatId}/messages`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ content, attachments, effort: getEffort() }),
-      signal,
+      signal: handlers.signal,
     });
   } catch (err) {
     if ((err as Error).name === "AbortError") return;
     throw err;
   }
-  await readReplyStream(res, { onDelta, onReasoning, onNotice, onStep, onRetract, onRelated });
+  await readReplyStream(res, handlers);
 }
 
-async function readReplyStream(res: Response, { onDelta, onReasoning, onNotice, onStep, onRetract, onRelated }: StreamHandlers): Promise<void> {
+async function readReplyStream(res: Response, { onDelta, onReasoning, onNotice, onStep, onRetract, onRelated, onStored }: StreamHandlers): Promise<void> {
   if (!res.ok || !res.body) {
     await expectJson(res);
     return;
@@ -358,6 +377,7 @@ async function readReplyStream(res: Response, { onDelta, onReasoning, onNotice, 
       if (event.step) onStep?.(event.step);
       if (event.retract) onRetract?.();
       if (event.delta) onDelta(event.delta);
+      if (event.stored) onStored?.(event.stored);
     }
   } catch (err) {
     if ((err as Error).name === "AbortError") return;

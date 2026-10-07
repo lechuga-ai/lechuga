@@ -18,6 +18,9 @@ import { SEAT_DOMAIN } from "../../../worker/src/seat-email";
 
 type AnyRoster = Roster | BotRoster;
 type Member = Person & { removed: boolean; seat?: boolean };
+// What the target's actions answer with: a fresh roster when something
+// changed, and the address a share is waiting on when it's pending.
+type Outcome = { roster?: AnyRoster; waitingFor?: string };
 
 export type SharingTarget = {
   kind: "chat" | "bot";
@@ -40,7 +43,9 @@ export type SharingTarget = {
     create: (username: string) => Promise<{ roster?: AnyRoster; seat: { username: string }; code: string }>;
     newCode: (userId: string) => Promise<{ username: string; code: string }>;
     remove: (userId: string) => Promise<{ roster?: AnyRoster }>;
-    upgrade: (userId: string, email: string) => Promise<{ roster?: AnyRoster }>;
+    // useInvite: spend one of the owner's invites on the address, once
+    // they've been asked (the needs_invite step, as with add).
+    upgrade: (userId: string, email: string, useInvite?: boolean) => Promise<{ roster?: AnyRoster }>;
   };
   onRoster: (roster: AnyRoster) => void;
   onPublic: () => void;
@@ -59,7 +64,9 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [needsInvite, setNeedsInvite] = useState<{ email: string; remaining: number } | null>(null);
+  // An address with no account yet, and what to run again with the owner's
+  // say-so to spend an invite on it: adding them, or making a seat theirs.
+  const [needsInvite, setNeedsInvite] = useState<{ email: string; remaining: number; retry: () => Promise<Outcome> } | null>(null);
   const [seatBox, setSeatBox] = useState(false);
   const [seatUser, setSeatUser] = useState("");
   const [handOver, setHandOver] = useState<{ username: string; code: string } | null>(null);
@@ -76,7 +83,10 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
   const others = active.filter((m) => !m.seat);
   const count = active.length + pending.length;
 
-  async function run<T extends { roster?: AnyRoster; waitingFor?: string }>(action: () => Promise<T>, done?: string): Promise<T | null> {
+  // Runs one of the target's actions and shows how it went. invite: the
+  // address the action was for and how to run it again spending an invite,
+  // for when the worker answers needs_invite.
+  async function run<T extends Outcome>(action: () => Promise<T>, done?: string, invite?: { email: string; retry: () => Promise<Outcome> }): Promise<T | null> {
     setBusy(true);
     setError(null);
     setNote(null);
@@ -87,8 +97,8 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
       setNote(result.waitingFor ? `Invite sent. It'll be waiting for ${result.waitingFor} when they sign in.` : (done ?? null));
       return result;
     } catch (err) {
-      if (err instanceof ApiError && err.code === "needs_invite") {
-        setNeedsInvite({ email: who.trim(), remaining: Number(err.body?.invitesRemaining ?? 0) });
+      if (err instanceof ApiError && err.code === "needs_invite" && invite) {
+        setNeedsInvite({ ...invite, remaining: Number(err.body?.invitesRemaining ?? 0) });
       } else {
         setError((err as Error).message);
       }
@@ -102,7 +112,12 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
     e.preventDefault();
     const entered = who.trim();
     if (!entered || busy) return;
-    if (await run(() => t.add(entered), `Shared with ${entered}.`)) setWho("");
+    const retry = async () => {
+      const r = await t.add(entered, true);
+      setWho("");
+      return r;
+    };
+    if (await run(() => t.add(entered), `Shared with ${entered}.`, { email: entered, retry })) setWho("");
   }
 
   async function makeSeat(e: FormEvent) {
@@ -120,11 +135,21 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
   async function upgrade(e: FormEvent) {
     e.preventDefault();
     if (!upgrading || !t.seats || !upgradeEmail.trim() || busy) return;
-    const name = upgrading.name;
-    if (await run(() => t.seats!.upgrade(upgrading.id, upgradeEmail.trim()), `${name} is a full account now; we've emailed them.`)) {
+    const seats = t.seats;
+    const { id, name } = upgrading;
+    const email = upgradeEmail.trim();
+    const done = `${name} is a full account now; we've emailed them.`;
+    const finish = () => {
       setUpgrading(null);
       setUpgradeEmail("");
-    }
+      setNote(done);
+    };
+    const retry = async () => {
+      const r = await seats.upgrade(id, email, true);
+      finish();
+      return r;
+    };
+    if (await run(() => seats.upgrade(id, email), done, { email, retry })) finish();
   }
 
   async function sendPointer(e: FormEvent) {
@@ -324,7 +349,7 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
               Never mind
             </button>
             {needsInvite.remaining > 0 && (
-              <button type="button" className="primary" disabled={busy} onClick={() => void run(() => t.add(needsInvite.email, true)).then((r) => r && setWho(""))}>
+              <button type="button" className="primary" disabled={busy} onClick={() => void run(needsInvite.retry)}>
                 {busy ? "inviting…" : "Use an invite"}
               </button>
             )}
@@ -399,7 +424,8 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
         <form onSubmit={upgrade} className="sharing-sub">
           <p>
             Make {upgrading.name} a full account with their email address. They keep their username and chats, get their own credits and
-            invites, and the account stops being yours to answer for. We'll email them.
+            invites, and the account stops being yours to answer for: the code stops working, and they sign in by email. Lechuga is invite
+            only, so if the address has no invite waiting we'll ask to use one of yours. We'll email them.
           </p>
           <div className="sharing-add">
             <input type="email" autoFocus placeholder="their email address" value={upgradeEmail} onChange={(e) => setUpgradeEmail(e.target.value)} disabled={busy} />

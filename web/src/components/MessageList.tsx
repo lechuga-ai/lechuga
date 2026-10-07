@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Message, Model, Person, Step } from "../api";
 import { Avatar } from "./Avatar";
@@ -162,12 +162,75 @@ function Author({ message, people, ownerId, meId }: { message: Message; people: 
   );
 }
 
+// One stored message. Memoised: while a reply streams, the list re-renders
+// for every word, and without this every earlier message would have its
+// markdown parsed and its attachments split again each time. The props are
+// stable between words (the message objects, the models list and the
+// people map only change when the chat changes), so a stored message
+// draws once.
+const MessageItem = memo(function MessageItem({
+  m,
+  models,
+  people,
+  ownerId,
+  meId,
+  showMeter,
+}: {
+  m: Message;
+  models: Model[];
+  people: Map<string, Person> | null;
+  ownerId?: string;
+  meId?: string;
+  showMeter: boolean;
+}) {
+  if (m.role === "assistant" && isSummary(m.content)) {
+    // Where the chat was compacted: what's above stays to read, but from
+    // here on the model works from this summary.
+    return (
+      <div className="chat-summary">
+        <div className="chat-summary-rule">
+          <span>chat compacted here</span>
+        </div>
+        <p>
+          From this point Lechuga works from a summary of everything above, and no longer re-reads it (or any files in it)
+          with each message.
+          {showMeter && m.credits != null && ` Writing it cost ${m.credits.toLocaleString()} credits.`}
+        </p>
+        <details>
+          <summary>read the summary</summary>
+          <ReactMarkdown>{keepLineBreaks(summaryText(m.content))}</ReactMarkdown>
+        </details>
+      </div>
+    );
+  }
+  return (
+    <div className={`message ${m.role} ${m.role === "user" && people ? ((m.user_id ?? ownerId) === meId ? "by-name" : "by-name theirs") : ""}`}>
+      {m.role === "user" && people && <Author message={m} people={people} ownerId={ownerId} meId={meId} />}
+      {m.reasoning && <Reasoning text={m.reasoning} live={false} />}
+      {m.steps && <Steps steps={m.steps} />}
+      {m.role === "assistant" ? <ReactMarkdown>{keepLineBreaks(m.content)}</ReactMarkdown> : <UserTurn content={m.content} />}
+      {m.error && (
+        <div className="message-error">
+          {m.error}
+          {m.errorCode === "out_of_credits" && (
+            <>
+              {" "}
+              <a href="/settings/credits">Get more credits</a>
+            </>
+          )}
+        </div>
+      )}
+      {showMeter && m.role === "assistant" && <Meter message={m} models={models} />}
+    </div>
+  );
+});
+
 export function MessageList({ messages, streamingText, streamingReasoning, streamingSteps = [], models, people = null, ownerId, meId }: Props) {
   // New pick whenever the message list is swapped (new or different chat), stable while typing.
   const emptyLine = useMemo(randomEmptyLine, [messages]);
   // Costs show by default; the choice to hide them is remembered per browser.
   const [showMeter, setShowMeter] = useState(() => localStorage.getItem(METER_KEY) !== "off");
-  const chatTotal = messages.reduce((n, m) => n + (m.credits ?? 0), 0);
+  const chatTotal = useMemo(() => messages.reduce((n, m) => n + (m.credits ?? 0), 0), [messages]);
 
   function toggleMeter() {
     setShowMeter((v) => {
@@ -193,45 +256,9 @@ export function MessageList({ messages, streamingText, streamingReasoning, strea
           </button>
         </div>
       )}
-      {messages.map((m) =>
-        m.role === "assistant" && isSummary(m.content) ? (
-          // Where the chat was compacted: what's above stays to read, but
-          // from here on the model works from this summary.
-          <div key={m.id} className="chat-summary">
-            <div className="chat-summary-rule">
-              <span>chat compacted here</span>
-            </div>
-            <p>
-              From this point Lechuga works from a summary of everything above, and no longer re-reads it (or any files in
-              it) with each message.
-              {showMeter && m.credits != null && ` Writing it cost ${m.credits.toLocaleString()} credits.`}
-            </p>
-            <details>
-              <summary>read the summary</summary>
-              <ReactMarkdown>{keepLineBreaks(summaryText(m.content))}</ReactMarkdown>
-            </details>
-          </div>
-        ) : (
-        <div key={m.id} className={`message ${m.role} ${m.role === "user" && people ? ((m.user_id ?? ownerId) === meId ? "by-name" : "by-name theirs") : ""}`}>
-          {m.role === "user" && people && <Author message={m} people={people} ownerId={ownerId} meId={meId} />}
-          {m.reasoning && <Reasoning text={m.reasoning} live={false} />}
-          {m.steps && <Steps steps={m.steps} />}
-          {m.role === "assistant" ? <ReactMarkdown>{keepLineBreaks(m.content)}</ReactMarkdown> : <UserTurn content={m.content} />}
-          {m.error && (
-            <div className="message-error">
-              {m.error}
-              {m.errorCode === "out_of_credits" && (
-                <>
-                  {" "}
-                  <a href="/settings/credits">Get more credits</a>
-                </>
-              )}
-            </div>
-          )}
-          {showMeter && m.role === "assistant" && <Meter message={m} models={models} />}
-        </div>
-        )
-      )}
+      {messages.map((m) => (
+        <MessageItem key={m.id} m={m} models={models} people={people} ownerId={ownerId} meId={meId} showMeter={showMeter} />
+      ))}
       {streamingText !== null && (
         <div className="message assistant">
           {streamingReasoning ? (

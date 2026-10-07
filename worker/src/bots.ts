@@ -103,8 +103,8 @@ export async function botFor(env: Env, chat: ChatRow): Promise<BotRow> {
 // A bot I own, have been let into, or that's public (public.ts), with
 // which. Anyone else's looks the same as no bot at all (null), so ids can't
 // be probed. seat: a username-and-code account, which keeps to the bots it
-// was given: no public ones.
-export async function botAccess(env: Env, botId: string, userId: string, seat = false): Promise<{ bot: BotRow; role: BotRole } | null> {
+// was given: no public ones. Always passed, never assumed.
+export async function botAccess(env: Env, botId: string, userId: string, seat: boolean): Promise<{ bot: BotRow; role: BotRole } | null> {
   const bot = await env.DB.prepare(
     `SELECT b.* FROM bots b WHERE b.id = ?1 AND (b.user_id = ?2 OR (b.visibility = 'public' AND ?3 = 0) OR EXISTS (
        SELECT 1 FROM bot_members m WHERE m.bot_id = b.id AND m.user_id = ?2 AND m.removed_at IS NULL))`
@@ -214,13 +214,13 @@ bots.post("/", async (c) => {
 // One bot, with who's in it. A member sees the soul too (read-only on the
 // page): it's fair to know what a bot you talk to has been told to be.
 bots.get("/:id", async (c) => {
-  const access = await botAccess(c.env, c.req.param("id"), c.get("userId"));
+  const access = await botAccess(c.env, c.req.param("id"), c.get("userId"), c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   return c.json({ bot: { ...access.bot, role: access.role }, roster: await botRoster(c.env, access.bot, access.role === "owner") });
 });
 
 bots.put("/:id", async (c) => {
-  const access = await botAccess(c.env, c.req.param("id"), c.get("userId"));
+  const access = await botAccess(c.env, c.req.param("id"), c.get("userId"), c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   if (access.role !== "owner") return c.json({ error: "only the bot's owner can change it" }, 403);
   const bot = access.bot;
@@ -255,7 +255,7 @@ bots.put("/:id", async (c) => {
 // them, as they would if removed.
 bots.delete("/:id", async (c) => {
   const userId = c.get("userId");
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   if (access.role !== "owner") return c.json({ error: "only the bot's owner can delete it" }, 403);
   const bot = access.bot;
@@ -274,7 +274,7 @@ bots.delete("/:id", async (c) => {
 // say-so.
 bots.post("/:id/members", async (c) => {
   const userId = c.get("userId");
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   if (access.role !== "owner") return c.json({ error: "only the bot's owner can share it" }, 403);
   const bot = access.bot;
@@ -348,7 +348,7 @@ bots.post("/:id/members", async (c) => {
 bots.delete("/:id/members/:userId", async (c) => {
   const userId = c.get("userId");
   const targetId = c.req.param("userId");
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   if (access.role !== "owner" && targetId !== userId) return c.json({ error: "only the bot's owner can remove people" }, 403);
   const removed = await c.env.DB.prepare("UPDATE bot_members SET removed_at = ? WHERE bot_id = ? AND user_id = ? AND removed_at IS NULL")
@@ -360,7 +360,7 @@ bots.delete("/:id/members/:userId", async (c) => {
 });
 
 bots.delete("/:id/pending/:pendingId", async (c) => {
-  const access = await botAccess(c.env, c.req.param("id"), c.get("userId"));
+  const access = await botAccess(c.env, c.req.param("id"), c.get("userId"), c.get("seatOf") !== null);
   if (!access || access.role !== "owner") return c.json({ error: "not found" }, 404);
   await c.env.DB.prepare("DELETE FROM bot_pending_shares WHERE id = ? AND bot_id = ?").bind(c.req.param("pendingId"), access.bot.id).run();
   return c.json({ roster: await botRoster(c.env, access.bot, true) });

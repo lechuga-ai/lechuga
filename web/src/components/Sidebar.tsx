@@ -414,8 +414,8 @@ export function Sidebar({
                         await deleteSeat(shareChat.chat.bot_id!, userId);
                         return { roster: (await getChat(shareChat.chat.id)).roster };
                       },
-                      upgrade: async (userId, email) => {
-                        await upgradeSeat(shareChat.chat.bot_id!, userId, email);
+                      upgrade: async (userId, email, useInvite) => {
+                        await upgradeSeat(shareChat.chat.bot_id!, userId, email, useInvite);
                         return { roster: (await getChat(shareChat.chat.id)).roster };
                       },
                     }

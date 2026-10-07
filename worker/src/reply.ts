@@ -18,6 +18,8 @@ import config from "../config.json";
 //   {step: {id, label, links?, done}}  a tool starting (done false) and finishing
 //   {delta}             the answer, in pieces
 //   {error}             the upstream broke; then [DONE] anyway
+//   {stored}            what the caller's store hook returned (the reply's
+//                       id and cost), when it has one
 //   [DONE]
 
 export type Step = { id: string; label: string; links?: { title: string; url: string }[]; done: boolean };
@@ -44,7 +46,18 @@ export function runReply(
   env: Env,
   model: string,
   turns: ChatTurn[],
-  opts: { maxTokens: number; effort: string; tools: ToolDef[]; notice?: string; related?: { id: string; title: string | null }[] }
+  opts: {
+    maxTokens: number;
+    effort: string;
+    tools: ToolDef[];
+    notice?: string;
+    related?: { id: string; title: string | null }[];
+    // Stores and charges the finished reply. Awaited before [DONE] goes out,
+    // so the browser can be told what the reply cost (the {stored} event)
+    // instead of asking for the chat again. A failure here is logged and
+    // the stream still ends cleanly.
+    store?: (outcome: ReplyOutcome) => Promise<Record<string, unknown> | void>;
+  }
 ): { stream: ReadableStream<Uint8Array>; done: Promise<ReplyOutcome> } {
   const encoder = new TextEncoder();
   let resolveDone!: (o: ReplyOutcome) => void;
@@ -65,6 +78,10 @@ export function runReply(
       const messages: ChatTurn[] = [...turns];
       const outcome: ReplyOutcome = { text: "", promptTokens: 0, completionTokens: 0, toolCredits: 0, toolCostUsd: 0, steps: [], toolUses: [] };
       const schemas = toolSchemas(opts.tools);
+      // Once a tool has brought text in from outside the chat (a web page,
+      // search results), a tool that acts for the person is withheld for the
+      // rest of the reply: a page could tell the model to call it.
+      let tainted = false;
       // The reply's own text is whatever the last round said; text from a
       // round that ended in a tool call is the model talking to itself.
       for (let round = 0; round <= config.tools.max_rounds; round++) {
@@ -158,7 +175,12 @@ export function runReply(
           send({ step });
           let result: string;
           if (!tool) result = `There is no tool called ${call.function.name}.`;
-          else {
+          else if (tool.trustedOnly && tainted) {
+            step.label = `Skipped: ${tool.label(args)}`;
+            result =
+              "This tool is off for the rest of this reply, because the reply has read something from the web. Nothing was saved. If the person asked for it, tell them to ask again in their next message, without a web search.";
+          } else {
+            if (tool.external) tainted = true;
             // Recorded whether or not it works. A search that came back empty
             // or broken still counted against Brave's 2,000 a month, and a
             // dashboard that only counts the good ones reads low exactly when
@@ -182,6 +204,14 @@ export function runReply(
           step.done = true;
           send({ step });
           messages.push({ role: "tool", tool_call_id: call.id, content: result });
+        }
+      }
+      if (opts.store) {
+        try {
+          const stored = await opts.store(outcome);
+          if (stored) send({ stored });
+        } catch (err) {
+          console.error("storing the reply failed", err);
         }
       }
       try {

@@ -96,6 +96,27 @@ export function createAuth(env: Env) {
       freshAge: 0,
     },
 
+    // Better Auth's own limiter, with its counters in D1 (the rateLimit
+    // table, migration 0020) rather than in memory: a Worker's memory is
+    // per isolate and short-lived, so an in-memory count would start over
+    // between requests and stop nobody. Per IP. The sign-in starts are the
+    // routes worth guarding: a seat's username-and-code sign-in is a
+    // password check that could be guessed at, and the link and code
+    // requests each send mail. Off for localhost, where the test keys and
+    // scripts would trip it.
+    rateLimit: {
+      enabled: !local,
+      storage: "database",
+      window: 60,
+      max: 120,
+      customRules: {
+        "/sign-in/email": { window: 60, max: 5 },
+        "/sign-in/magic-link": { window: 60, max: 5 },
+        "/email-otp/send-verification-otp": { window: 60, max: 5 },
+        "/sign-in/email-otp": { window: 60, max: 10 },
+      },
+    },
+
     advanced: {
       // Plan v3 constraint: HttpOnly, Secure, SameSite=Lax. Secure is dropped
       // only for http://localhost, where browsers would refuse the cookie.
@@ -104,6 +125,9 @@ export function createAuth(env: Env) {
         httpOnly: true,
         sameSite: "lax",
       },
+      // Behind Cloudflare the caller's address is this header, not
+      // x-forwarded-for, which anyone can set.
+      ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] },
     },
 
     hooks: {

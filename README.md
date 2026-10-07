@@ -180,6 +180,8 @@ Two things only exist once used. The overnight memory pass runs from the cron tr
 
 ## Testing
 
+Two things run without a live copy, and GitHub Actions runs both on every pull request (`.github/workflows/check.yml`): `npm run check` typechecks the worker and builds the web app, and `npm test` runs the unit tests beside the worker's pure functions (`worker/src/*.test.ts`: the credit sums, the attachment format, the webhook signature, the address check for the model's page reader).
+
 The scripts in `eval/` run against a live copy, local or deployed. Most need a session cookie, copied whole from the `Cookie` header of any `/api` request in the browser's network tab. A session cookie is as good as a password; never paste one anywhere.
 
 ```

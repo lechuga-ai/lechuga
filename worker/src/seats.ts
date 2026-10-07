@@ -3,8 +3,8 @@ import { hashPassword } from "better-auth/crypto";
 import type { AppEnv, Env } from "./types";
 import { botAccess, botRoster } from "./bots";
 import { checkUsernameFormat, normalizeUsername } from "./username";
-import { seatEmail } from "./seat-email";
-import { hasAccount, normalizeEmail } from "./invites";
+import { isSeatEmail, seatEmail } from "./seat-email";
+import { hasAccount, normalizeEmail, pendingInviteFor } from "./invites";
 import { applyOnce } from "./credits";
 import { sendEmail } from "./email";
 import { seatUpgradedEmail } from "./email/templates";
@@ -36,10 +36,13 @@ export async function seatsOf(env: Env, ownerId: string): Promise<number> {
   return row?.n ?? 0;
 }
 
-// Six digits, easy to say out loud and to type on a tablet.
+// Eight digits: still something to say out loud and type on a tablet, and
+// a hundred million possibilities against someone guessing (the sign-in
+// route is also rate limited, auth.ts).
+const CODE_DIGITS = 8;
 function newCode(): string {
-  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000;
-  return String(n).padStart(6, "0");
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 10 ** CODE_DIGITS;
+  return String(n).padStart(CODE_DIGITS, "0");
 }
 
 function cleanCode(raw: unknown): string | null {
@@ -55,7 +58,7 @@ export const seats = new Hono<AppEnv>();
 seats.post("/:id/seats", async (c) => {
   const userId = c.get("userId");
   if (c.get("seatOf")) return c.json({ error: "not found" }, 404);
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   if (access.role !== "owner") return c.json({ error: "only the bot's owner can add someone this way" }, 403);
   const bot = access.bot;
@@ -100,7 +103,7 @@ seats.post("/:id/seats", async (c) => {
 // A new code, shown once.
 seats.post("/:id/seats/:userId/code", async (c) => {
   const userId = c.get("userId");
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access || access.role !== "owner") return c.json({ error: "not found" }, 404);
   const seatId = c.req.param("userId");
   const seat = await c.env.DB.prepare("SELECT username FROM user WHERE id = ? AND seat_of = ?").bind(seatId, userId).first<{ username: string }>();
@@ -121,27 +124,51 @@ seats.post("/:id/seats/:userId/code", async (c) => {
 // from then on it's an account like any other. It keeps its username, its
 // chats and its place in the bot (as an ordinary member now), gains the
 // starter credits and invites a new account gets, and stops being the
-// owner's to answer for. The code keeps working until they choose not to
-// use it; sign-in by email works as soon as they ask for a link.
+// owner's to answer for. The code stops working: the account is theirs,
+// and the person who made it shouldn't be able to sign in as them. They
+// sign in by email from here, with a link or a code, as soon as they ask.
+//
+// Lechuga is invite only, and this makes an account for an address, so the
+// address needs an invite: one already waiting for it, or one of the
+// owner's, spent with their say-so (the same step as sharing with a new
+// address, sharing.ts). Without that, a bot's owner could open accounts
+// for any address they liked.
 seats.post("/:id/seats/:userId/upgrade", async (c) => {
   const userId = c.get("userId");
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access || access.role !== "owner") return c.json({ error: "not found" }, 404);
   const seatId = c.req.param("userId");
   const seat = await c.env.DB.prepare("SELECT username FROM user WHERE id = ? AND seat_of = ?").bind(seatId, userId).first<{ username: string }>();
   if (!seat) return c.json({ error: "not found" }, 404);
   const body = await c.req.json().catch(() => ({}));
   const email = normalizeEmail(body?.email);
-  if (!email) return c.json({ error: "that doesn't look like an email address" }, 400);
+  if (!email || isSeatEmail(email)) return c.json({ error: "that doesn't look like an email address" }, 400);
   if (await hasAccount(c.env, email)) return c.json({ error: "that address already has an account" }, 409);
 
+  const invite = await pendingInviteFor(c.env, email);
+  if (!invite) {
+    if (body?.useInvite !== true) {
+      const me = await c.env.DB.prepare("SELECT invites_remaining FROM user WHERE id = ?").bind(userId).first<{ invites_remaining: number }>();
+      return c.json({ error: "that address doesn't have an invite yet", code: "needs_invite", invitesRemaining: me?.invites_remaining ?? 0 }, 409);
+    }
+    // Spent atomically: the UPDATE only matches while there are invites
+    // left, so two quick clicks can't overspend.
+    const spend = await c.env.DB.prepare("UPDATE user SET invites_remaining = invites_remaining - 1 WHERE id = ? AND invites_remaining > 0").bind(userId).run();
+    if (!spend.meta.changes) return c.json({ error: "no invites left" }, 400);
+  }
+
+  const now = Date.now();
   // The terms were accepted on its behalf when it was made; now it's
   // someone's own, they accept them themselves on their first visit.
-  await c.env.DB.prepare(
-    "UPDATE user SET email = ?, emailVerified = 0, seat_of = NULL, invites_remaining = ?, terms_accepted_at = NULL, terms_version = NULL, updatedAt = ? WHERE id = ?"
-  )
-    .bind(email, config.default_invites, new Date().toISOString(), seatId)
-    .run();
+  await c.env.DB.batch([
+    c.env.DB.prepare(
+      "UPDATE user SET email = ?, emailVerified = 0, seat_of = NULL, invites_remaining = ?, invited_by = ?, terms_accepted_at = NULL, terms_version = NULL, updatedAt = ? WHERE id = ?"
+    ).bind(email, config.default_invites, invite?.inviter_id ?? invite?.sent_by ?? userId, new Date(now).toISOString(), seatId),
+    // The code, and every device signed in with it.
+    c.env.DB.prepare("DELETE FROM account WHERE userId = ? AND providerId = 'credential'").bind(seatId),
+    c.env.DB.prepare("DELETE FROM session WHERE userId = ?").bind(seatId),
+    ...(invite ? [c.env.DB.prepare("UPDATE invites SET status = 'accepted', accepted_at = ? WHERE id = ?").bind(now, invite.id)] : []),
+  ]);
   // Keyed by user id, so it lands once even if this is somehow repeated.
   await applyOnce(c.env, { userId: seatId, delta: config.starter_credits, reason: "signup_bonus", ref: seatId });
   const sharerName = c.get("username") ? `@${c.get("username")}` : c.get("userName") || "Someone";
@@ -160,10 +187,17 @@ seats.post("/:id/seats/:userId/upgrade", async (c) => {
 // ones.
 seats.delete("/:id/seats/:userId", async (c) => {
   const userId = c.get("userId");
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access || access.role !== "owner") return c.json({ error: "not found" }, 404);
   const seatId = c.req.param("userId");
-  const gone = await c.env.DB.prepare("DELETE FROM user WHERE id = ? AND seat_of = ?").bind(seatId, userId).run();
-  if (!gone.meta.changes) return c.json({ error: "not found" }, 404);
+  const seat = await c.env.DB.prepare("SELECT 1 AS one FROM user WHERE id = ? AND seat_of = ?").bind(seatId, userId).first();
+  if (!seat) return c.json({ error: "not found" }, 404);
+  await c.env.DB.batch([
+    // Its chats become the owner's before the account goes: chats cascade
+    // on their user (0002_auth.sql), and these are the owner's to keep. The
+    // turns inside keep the seat's id, which reads as "someone who left".
+    c.env.DB.prepare("UPDATE chats SET user_id = ? WHERE user_id = ?").bind(userId, seatId),
+    c.env.DB.prepare("DELETE FROM user WHERE id = ? AND seat_of = ?").bind(seatId, userId),
+  ]);
   return c.json({ roster: await botRoster(c.env, access.bot, true) });
 });

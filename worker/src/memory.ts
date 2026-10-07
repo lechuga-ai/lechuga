@@ -141,6 +141,9 @@ export function rememberTool(userId: string): ToolDef {
       required: ["note"],
     },
     available: () => true,
+    // Writes for the person, so not after a web page has had its say in
+    // this reply (reply.ts): a page could ask the model to remember things.
+    trustedOnly: true,
     label: (args) => `Remembered: ${String(args.note ?? "").slice(0, 80)}`,
     async run(env, args) {
       const free = { costUsd: 0, credits: 0 };

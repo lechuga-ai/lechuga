@@ -146,7 +146,7 @@ export function seatUpgradedEmail(opts: { sharerName: string; username: string; 
     text: [
       `${opts.sharerName} has made your Lechuga account (@${opts.username}) a full account, with this email address.`,
       "",
-      "From now on you can sign in with this address: ask for a link at the sign-in page. Your username and code still work too, if you'd rather.",
+      "From now on you sign in with this address: ask for a link (or, in the installed app, a code) at the sign-in page. The old username-and-code sign-in no longer works, so nobody else can sign in as you.",
       "",
       "You have your own credits and invites now, and your chats are yours. Nobody reads them unless you share them.",
       "",
