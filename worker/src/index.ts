@@ -51,6 +51,16 @@ app.use("/api/*", async (c, next) => {
   await next();
 });
 
+// The API's answers are personal and change: never cached by a browser or
+// a proxy (a shared computer shouldn't hand the next person a chat from
+// its cache). Avatars set their own, and keep it. Registered here, before
+// the routes, because Hono only runs a middleware for routes added after it.
+app.use("/api/*", async (c, next) => {
+  await next();
+  if (!c.res.headers.has("cache-control")) c.res.headers.set("cache-control", "no-store");
+  c.res.headers.set("x-content-type-options", "nosniff");
+});
+
 // Public routes. Anything registered before the session check below answers
 // without a signed-in user; keep this list short and deliberate.
 //
@@ -120,7 +130,39 @@ app.route("/api/convert", convert);
 app.route("/api", sharing);
 app.route("/api", chat);
 
-app.get("*", (c) => c.env.ASSETS.fetch(c.req.raw));
+// What every page and asset carries. The policy says where a page may load
+// things from: its own origin, Turnstile's script and frame, Google's
+// fonts. Pictures only from here or inline (data:), which is what the
+// composer and avatars use; so an image in a reply's markdown can't fetch
+// from a host of the model's (or another person's) choosing and learn who
+// read it. No framing by other sites, and links don't carry the chat's
+// address along as a referrer.
+const PAGE_HEADERS: Record<string, string> = {
+  "content-security-policy": [
+    "default-src 'self'",
+    "script-src 'self' https://challenges.cloudflare.com",
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob:",
+    "connect-src 'self'",
+    "frame-src https://challenges.cloudflare.com",
+    "worker-src 'self'",
+    "frame-ancestors 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; "),
+  "referrer-policy": "strict-origin-when-cross-origin",
+  "x-content-type-options": "nosniff",
+  "x-frame-options": "DENY",
+  "permissions-policy": "camera=(), microphone=(), geolocation=()",
+};
+
+app.get("*", async (c) => {
+  const res = await c.env.ASSETS.fetch(c.req.raw);
+  const headers = new Headers(res.headers);
+  for (const [name, value] of Object.entries(PAGE_HEADERS)) headers.set(name, value);
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+});
 
 export default {
   fetch: app.fetch,

@@ -50,8 +50,11 @@ export async function createInvite(
   env: Env,
   opts: { email: string; inviterId: string | null; inviterName: string | null; sharedChat?: boolean }
 ): Promise<{ ok: true; invite: InviteRow } | { ok: false; reason: string }> {
-  if (await hasAccount(env, opts.email)) return { ok: false, reason: "that address already has access" };
-  if (await pendingInviteFor(env, opts.email)) return { ok: false, reason: "that address already has an invite waiting" };
+  // One wording for both, so inviting an address doesn't say whether it
+  // already has an account.
+  if ((await hasAccount(env, opts.email)) || (await pendingInviteFor(env, opts.email))) {
+    return { ok: false, reason: "that address already has access, or an invite waiting" };
+  }
 
   const now = Date.now();
   let invite: InviteRow = {

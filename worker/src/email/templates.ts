@@ -146,7 +146,7 @@ export function seatUpgradedEmail(opts: { sharerName: string; username: string; 
     text: [
       `${opts.sharerName} has made your Lechuga account (@${opts.username}) a full account, with this email address.`,
       "",
-      "From now on you can sign in with this address: ask for a link at the sign-in page. Your username and code still work too, if you'd rather.",
+      "From now on you sign in with this address: ask for a link (or, in the installed app, a code) at the sign-in page. The old username-and-code sign-in no longer works, so nobody else can sign in as you.",
       "",
       "You have your own credits and invites now, and your chats are yours. Nobody reads them unless you share them.",
       "",
@@ -158,14 +158,14 @@ export function seatUpgradedEmail(opts: { sharerName: string; username: string; 
 }
 
 // Someone pointing a person at a public chat or bot. No membership comes
-// of it: public is everyone's already.
+// of it: public is everyone's to read already.
 export function publicPointerEmail(opts: { sharerName: string; what: "chat" | "bot"; title: string; url: string }): EmailContent {
   return {
     subject: `${opts.sharerName} thought you'd like a ${opts.what} on Lechuga`,
     text: [
       `${opts.sharerName} sent you a public ${opts.what} on Lechuga: "${opts.title}".`,
       "",
-      opts.what === "chat" ? "Anyone on Lechuga can read it and join in; the replies are on Lechuga." : "Anyone on Lechuga can chat with it; every chat with it is public, and the replies are on Lechuga.",
+      opts.what === "chat" ? "Anyone on Lechuga can read it; the replies are on Lechuga." : "Anyone on Lechuga can chat with it; every chat with it is public, and the replies are on Lechuga.",
       "",
       opts.url,
     ].join("\n"),

@@ -1,5 +1,6 @@
 import type { BotRow, ChatRow, Env } from "./types";
 import { collectText, streamChat } from "./gateway";
+import type { ContentPart } from "./attachments";
 import { sendEmail } from "./email";
 import { guardAlertEmail } from "./email/templates";
 import config from "../config.json";
@@ -32,12 +33,17 @@ export const GUARDED_PROMPT =
   "Don't pretend to be a real person, and never agree to keep a secret: you're a bot, and the person who set you up can read these chats. " +
   "Keep answers short, plain and encouraging.";
 
-// The check. One word back; anything unexpected reads as fine, so a broken
-// check never blocks an ordinary question, and never lets one through as
-// something it isn't either: a hit needs the exact word.
-export async function checkMessage(env: Env, text: string): Promise<GuardCategory | null> {
-  const sample = text.replace(/\s+/g, " ").trim().slice(0, 3000);
-  if (!sample) return null;
+// The check, on the words and on any pictures (the check model sees
+// pictures). One word back; an unexpected word reads as fine, so a muddled
+// answer never blocks an ordinary question and never lets one through as
+// something it isn't either: a hit needs the exact word. If the call fails
+// altogether the answer is "unavailable", and the caller holds the message
+// rather than letting it through unchecked: this is the layer to trust.
+export async function checkMessage(env: Env, text: string, images: string[] = []): Promise<GuardCategory | null | "unavailable"> {
+  const sample = text.replace(/\s+/g, " ").trim().slice(0, 6000);
+  if (!sample && images.length === 0) return null;
+  const words = `Message:\n<<<\n${sample || "(no words, only the picture)"}\n>>>`;
+  const content: string | ContentPart[] = images.length ? [{ type: "text", text: words }, ...images.map((url) => ({ type: "image_url" as const, image_url: { url } }))] : words;
   try {
     const { stream } = await streamChat(
       env,
@@ -46,14 +52,14 @@ export async function checkMessage(env: Env, text: string): Promise<GuardCategor
         {
           role: "system",
           content:
-            "You are a safety check for a chat app that a child may be using. You will be shown one message the person typed. Answer with exactly one word from this list and nothing else:\n" +
+            "You are a safety check for a chat app that a child may be using. You will be shown one message the person typed, and any pictures they attached to it. Answer with exactly one word from this list and nothing else:\n" +
             "SELF_HARM: the person talks about hurting themselves, suicide, wanting to die or disappear, or not wanting to be here.\n" +
             "VIOLENCE: hurting or killing someone, weapons (getting, making or using them), threats, fighting plans.\n" +
             "EXPLICIT: sexual content, nudity, pornography, graphic gore, or getting drugs, alcohol or tobacco.\n" +
             "FINE: anything else. Homework about history or biology is fine. Feelings, sadness, a bad day, being bullied are fine unless self-harm is in them. Asking what a word means is fine. A question about the news is fine.\n" +
             "When in doubt between FINE and another word, answer FINE unless the message is clearly about that thing.",
         },
-        { role: "user", content: `Message:\n<<<\n${sample}\n>>>` },
+        { role: "user", content },
       ],
       { effort: "low", maxTokens: 8 }
     );
@@ -64,7 +70,7 @@ export async function checkMessage(env: Env, text: string): Promise<GuardCategor
     return null;
   } catch (err) {
     console.error("guard check failed", err);
-    return null;
+    return "unavailable";
   }
 }
 

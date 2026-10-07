@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "npm run dev --workspace worker & npm run dev --workspace web & wait",
     "build": "npm run build --workspace web",
+    "check": "npm run check --workspace worker && npm run build --workspace web",
+    "test": "vitest run",
     "deploy:dev": "npm run build --workspace web && npm run deploy:dev --workspace worker",
     "deploy:prod": "npm run build --workspace web && npm run deploy:prod --workspace worker"
+  },
+  "devDependencies": {
+    "vitest": "^3.0.0"
   }
 }

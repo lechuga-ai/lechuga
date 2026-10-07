@@ -266,7 +266,7 @@ export function BotShare({
       create: (username) => createSeat(bot.id, { username }),
       newCode: (userId) => resetSeatCode(bot.id, userId),
       remove: (userId) => deleteSeat(bot.id, userId),
-      upgrade: (userId, email) => upgradeSeat(bot.id, userId, email),
+      upgrade: (userId, email, useInvite) => upgradeSeat(bot.id, userId, email, useInvite),
     },
     onRoster: (r) => took(r as BotRoster),
     onPublic: () => {},

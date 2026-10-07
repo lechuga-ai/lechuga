@@ -33,7 +33,8 @@ export type PromptOptions = {
   // The bot is guarded (guard.ts): the locked section goes last, after the
   // soul, so it has the final word.
   guarded?: boolean;
-  // The chat is public (public.ts): anyone on Lechuga can read it.
+  // The chat is public (public.ts): anyone on Lechuga can read it, though
+  // only the people it's shared with write in it.
   isPublic?: boolean;
   now?: Date;
 };
@@ -129,7 +130,7 @@ function howToBe(): string {
 }
 
 const PUBLIC_CHAT =
-  "This chat is public: anyone on Lechuga can read it and join in, now or later. Keep that in mind: don't ask for private details, and if someone shares one, don't repeat it. Answer so that a stranger reading later can follow.";
+  "This chat is public: anyone on Lechuga can read it, now or later, though only the people it's shared with can write in it. Keep that in mind: don't ask for private details, and if someone shares one, don't repeat it. Answer so that a stranger reading later can follow.";
 
 const SHARED =
   "Several people are taking part in this chat. Each of their messages starts with the sender's name in square brackets, which the app adds. Don't start your own replies with a name in brackets.";

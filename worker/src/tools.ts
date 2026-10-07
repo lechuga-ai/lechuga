@@ -21,6 +21,14 @@ export type ToolDef = {
   // off entirely unless the answer is clearly harmless: web_search doesn't
   // have one, because what someone searched for is theirs.
   logHost?: (args: Record<string, unknown>) => string | null;
+  // True for a tool that brings text in from outside the chat (a web page,
+  // search results). What it returns could have been written to steer the
+  // model, so from then on, within the reply, tools marked trustedOnly are
+  // withheld (reply.ts).
+  external?: boolean;
+  // True for a tool that acts on the person's behalf (writes to their
+  // memory): only offered while nothing external has been read this reply.
+  trustedOnly?: boolean;
   run: (env: Env, args: Record<string, unknown>) => Promise<ToolOutcome>;
 };
 
@@ -61,6 +69,7 @@ const webSearch: ToolDef = {
     required: ["query"],
   },
   available: (env) => Boolean(env.BRAVE_SEARCH_API_KEY),
+  external: true,
   label: (args) => `Searched: ${String(args.query ?? "")}`,
   async run(env, args) {
     const query = String(args.query ?? "").trim().slice(0, 400);
@@ -115,6 +124,7 @@ const readPage: ToolDef = {
     required: ["url"],
   },
   available: () => true,
+  external: true,
   label: (args) => `Read: ${hostOf(String(args.url ?? ""))}`,
   // Not hostOf: that falls back to the raw string so the chat has something
   // to show, and the raw string is whatever the model made up. Stored, it
@@ -142,12 +152,11 @@ const readPage: ToolDef = {
     }
     let res: Response;
     try {
-      res = await fetch(url, {
-        headers: { "user-agent": "Mozilla/5.0 (compatible; Lechuga/1.0; +https://lechuga.ai)", accept: "text/html,application/xhtml+xml,text/plain,application/pdf;q=0.9,*/*;q=0.5" },
-        redirect: "follow",
-        signal: AbortSignal.timeout(T.timeout_ms),
-      });
+      const fetched = await fetchPublic(url);
+      res = fetched.res;
+      url = fetched.url;
     } catch (err) {
+      if (err instanceof RefusedAddress) return { result: "That address can't be read from here.", ...free };
       return { result: `Couldn't reach ${url.hostname}: ${(err as Error).message}`, ok: false, ...free };
     }
     if (!res.ok) return { result: `${url.hostname} answered ${res.status}.`, ok: false, ...free };
@@ -204,14 +213,59 @@ function hostOf(u: string): string {
   }
 }
 
-function isPrivateHost(host: string): boolean {
+const MAX_REDIRECTS = 5;
+
+class RefusedAddress extends Error {}
+
+// Fetches a page, following redirects by hand so every hop gets the same
+// check as the first address: a public page can answer with a redirect to
+// somewhere private, and with redirect: "follow" the runtime would go there
+// unasked. Returns the response and the address it finally came from.
+async function fetchPublic(start: URL): Promise<{ res: Response; url: URL }> {
+  let url = start;
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const res = await fetch(url, {
+      headers: { "user-agent": "Mozilla/5.0 (compatible; Lechuga/1.0; +https://lechuga.ai)", accept: "text/html,application/xhtml+xml,text/plain,application/pdf;q=0.9,*/*;q=0.5" },
+      redirect: "manual",
+      signal: AbortSignal.timeout(T.timeout_ms),
+    });
+    const location = res.headers.get("location");
+    if (res.status < 300 || res.status >= 400 || !location) return { res, url };
+    let next: URL;
+    try {
+      next = new URL(location, url);
+    } catch {
+      throw new RefusedAddress("redirected to an address that isn't valid");
+    }
+    if (!/^https?:$/.test(next.protocol) || isPrivateHost(next.hostname)) throw new RefusedAddress("redirected to an address that can't be read from here");
+    url = next;
+  }
+  throw new Error("too many redirects");
+}
+
+// Addresses the worker must not fetch on the model's behalf: names and
+// IPv4 ranges that mean something on a network and nothing on the public
+// web (loopback, private, link-local and the cloud metadata address,
+// carrier-grade NAT, benchmarking, multicast and above). IPv6 literals
+// are refused whole; the public web is reachable by name.
+export function isPrivateHost(host: string): boolean {
   const h = host.toLowerCase();
-  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal")) return true;
-  // IPv4 literals in private, loopback, link-local or metadata ranges.
+  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".local") || h.endsWith(".internal") || h.endsWith(".arpa")) return true;
   const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
   if (m) {
     const [a, b] = [Number(m[1]), Number(m[2])];
-    return a === 10 || a === 127 || a === 0 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 0) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      a >= 224
+    );
   }
-  return h.startsWith("[") || h === "::1";
+  return h.startsWith("[") || h.includes(":");
 }

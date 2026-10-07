@@ -1,4 +1,5 @@
 import type { Auth } from "./auth";
+import config from "../config.json";
 
 export type Env = {
   DB: D1Database;
@@ -49,6 +50,8 @@ export type ModelConfig = {
   id: string;
   label: string;
   blurb?: string;
+  // Can look at pictures (attachments.ts).
+  vision?: boolean;
   retired?: boolean;
   credit_per_million_prompt_tokens: number;
   credit_per_million_completion_tokens: number;
@@ -63,18 +66,48 @@ export type CreditPack = {
   credits: number;
 };
 
+// The shape of config.json. The code reads the JSON directly (TypeScript
+// infers its type), so this is documentation with teeth: the `satisfies`
+// at the bottom of this file fails the typecheck when a field the code
+// expects goes missing or changes type, and it's where a new field's
+// meaning gets written down.
 export type AppConfig = {
   models: ModelConfig[];
+  // How hard the model thinks before answering (the composer's dropdown).
+  efforts: { id: string; label: string; hint: string }[];
+  default_effort: string;
+  // What an empty chat says, picked at random.
+  empty_lines: string[];
   starter_credits: number;
   credit_packs: CreditPack[];
   subscription: CreditPack;
+  // Tools the model may call while answering (tools.ts).
+  tools: {
+    _comment?: string;
+    max_rounds: number;
+    timeout_ms: number;
+    web_search: { results: number; cost_usd: number; credits: number; free_per_month: number };
+    read_page: { max_bytes: number; max_chars: number };
+  };
+  // The overnight memory pass (nightly.ts).
+  nightly: { _comment?: string; train_tokens: number; turn_chars: number; reply_chars: number; min_turns: number; concurrency: number };
+  // Public chats, paid for by the house account (public.ts).
+  public_chats: { _comment?: string; daily_cap_credits: number; replies_in_flight: number; per_person_per_day: number; related_max: number; bring_in_chars: number };
+  // Stripe as seller of record (handles sales tax). See billing.ts.
+  stripe_managed_payments: boolean;
   // What the billing page's "where your money goes" is computed from. markup
   // is how many times Cloudflare's price the credit rates are (the rates in
   // models[] must agree with it); the Stripe numbers are its standard card
-  // fee; monthly_fixed are bills that don't depend on usage.
-  costs: { markup: number; stripe_percent: number; stripe_fixed_usd: number; stripe_managed_percent: number; monthly_fixed: { label: string; usd: number }[] };
-  // Stripe as seller of record (handles sales tax). See billing.ts.
-  stripe_managed_payments: boolean;
+  // fee; monthly_fixed are bills that don't depend on usage;
+  // gateway_daily_cap_usd is the AI Gateway's spend limit, for /admin.
+  costs: {
+    markup: number;
+    gateway_daily_cap_usd: number;
+    stripe_percent: number;
+    stripe_fixed_usd: number;
+    stripe_managed_percent: number;
+    monthly_fixed: { label: string; usd: number }[];
+  };
   default_invites: number;
   invite_expiry_days: number;
   username_rules: { min: number; max: number; pattern: string };
@@ -84,8 +117,38 @@ export type AppConfig = {
   trial: { per_visitor_per_day: number; per_day: number; max_message_chars: number; max_reply_tokens: number };
   daily_message_cap: number;
   daily_invite_cap: number;
+  // Limits against abuse and runaway cost, all enforced in the worker.
+  limits: {
+    messages_per_minute: number;
+    replies_in_flight: number;
+    history_tokens: number;
+    attachments_per_message: number;
+    attachment_chars: number;
+    images_per_message: number;
+    image_chars: number;
+    convert_max_bytes: number;
+    paste_becomes_attachment_chars: number;
+    max_reply_tokens: number;
+    // How long to wait for the model to start answering, and the longest
+    // gap allowed between chunks once it has (gateway.ts).
+    model_first_byte_ms: number;
+    model_idle_ms: number;
+    // How much of each text attachment a guarded bot's check reads (guard.ts).
+    guard_attachment_chars: number;
+    summary_tokens: number;
+    memory_chars: number;
+    remember_tokens: number;
+    compact_offer_tokens: number;
+    public_requests_per_day: number;
+    chat_members: number;
+    seats_per_account: number;
+    avatar_chars: number;
+    max_manual_grant: number;
+  };
   terms_version: string;
 };
+
+config satisfies AppConfig;
 
 // A bot (migration 0013): whose it is, what it's called, how it talks, and
 // the model its new chats start on (null: the default). is_default marks
@@ -114,8 +177,9 @@ export type ChatRow = {
   // The bot the chat is with. Null only on a row from before bots, which
   // botFor() reads as the owner's Seed.
   bot_id: string | null;
-  // 'public': anyone signed in can read and join it, and the house account
-  // pays (public.ts). slug is reserved, unused.
+  // 'public': anyone signed in can read it, only the owner and the people
+  // it's shared with write in it, and the house account pays (public.ts).
+  // slug is reserved, unused.
   visibility: "private" | "public";
   slug: string | null;
   title: string | null;

@@ -5,7 +5,29 @@ import { MessageList } from "../components/MessageList";
 import { Composer } from "../components/Composer";
 import { AvatarStack } from "../components/Avatar";
 import { SharingDialog } from "../components/Sharing";
-import { ApiError, addChatMember, cancelPendingShare, compactChat, createSeat, deleteSeat, getChat, makeChatPublic, rememberChat, removeChatMember, resetSeatCode, sendMessage, upgradeSeat, type Me, type Message, type Model, type Person, type Roster, type Step } from "../api";
+import {
+  ApiError,
+  addChatMember,
+  cancelPendingShare,
+  compactChat,
+  createSeat,
+  deleteSeat,
+  getChat,
+  getChatHead,
+  makeChatPublic,
+  rememberChat,
+  removeChatMember,
+  resetSeatCode,
+  sendMessage,
+  upgradeSeat,
+  type Me,
+  type Message,
+  type Model,
+  type Person,
+  type Roster,
+  type Step,
+  type StoredReply,
+} from "../api";
 import { takeStartMessage } from "../startMessage";
 import { appLink, copyText } from "../copy";
 import { composeMessage, estimateMessageTokens, type Attachment } from "../../../worker/src/attachments";
@@ -40,7 +62,8 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   const [botOwner, setBotOwner] = useState<Person | null>(null);
   // The chat's bot, for making a username-and-code account from here.
   const [botId, setBotId] = useState<string | null>(null);
-  // Public: anyone can read and join; Lechuga pays. Set from the chat row.
+  // Public: anyone can read it, only the people it's shared with write in
+  // it, and Lechuga pays. Set from the chat row.
   const [isPublic, setIsPublic] = useState(false);
   // "Asked before": public chats that opened with this chat's first words.
   const [related, setRelated] = useState<{ id: string; title: string | null }[]>([]);
@@ -54,8 +77,9 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   // The Link button's brief thank-you.
   const [copied, setCopied] = useState(false);
   // Whose chat this is and who's in it. A chat made a moment ago on the start
-  // page is mine and has nobody else in it yet.
-  const [role, setRole] = useState<"owner" | "member">("owner");
+  // page is mine and has nobody else in it yet. A reader can only see it
+  // because it's public: no box to type in.
+  const [role, setRole] = useState<"owner" | "member" | "reader">("owner");
   const [roster, setRoster] = useState<Roster | null>(null);
   const [sharing, setSharing] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -129,6 +153,9 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
     let full = "";
     let reasoning = "";
     let steps: Step[] = [];
+    // In an object, not a plain variable: TypeScript doesn't see a variable
+    // assigned inside a callback, and would read it as always null below.
+    const got: { stored: StoredReply | null } = { stored: null };
     let failure: string | null = null;
     let failureCode: string | undefined;
     const controller = new AbortController();
@@ -139,6 +166,9 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
         onDelta: (delta) => {
           full += delta;
           setStreamingText(full);
+        },
+        onStored: (s) => {
+          got.stored = s;
         },
         onReasoning: (r) => {
           reasoning += r;
@@ -165,7 +195,10 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
       setStreamingSteps([]);
     }
 
-    const localId = crypto.randomUUID();
+    // The stream's last event says what the worker stored and charged, so
+    // the reply lands with its id and cost already on it.
+    const settled = got.stored;
+    const localId = settled?.id ?? crypto.randomUUID();
     setMessages((prev) => [
       ...prev,
       {
@@ -173,8 +206,10 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
         chat_id: chatId,
         role: "assistant",
         content: full,
-        prompt_tokens: null,
-        completion_tokens: null,
+        prompt_tokens: settled?.prompt_tokens ?? null,
+        completion_tokens: settled?.completion_tokens ?? null,
+        credits: settled?.credits,
+        model: settled?.model,
         created_at: Date.now(),
         reasoning: reasoning.trim() || undefined,
         steps: steps.length ? steps : undefined,
@@ -182,11 +217,15 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
         errorCode: failureCode,
       },
     ]);
-    if (!failure) void settleReply(localId);
+    if (!failure) {
+      if (settled) refreshBalance();
+      else void settleReply(localId);
+    }
     await refreshChats();
   }
 
-  // The worker stores and charges a reply just after its stream ends. Re-read
+  // The fallback when the stream ended without saying what was stored (the
+  // connection dropped before the last event, or an older worker): re-read
   // the chat until the stored copy shows up, then copy what it cost onto the
   // message on screen and refresh the balance.
   async function settleReply(localId: string) {
@@ -215,31 +254,39 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   const owner = roster?.owner ?? mePerson;
   const others = roster?.members ?? [];
   const active = others.filter((m) => !m.removed);
-  const isShared = role === "member" || active.length > 0;
+  const isShared = role !== "owner" || active.length > 0;
   // Everyone who has ever typed here, for the names over their messages.
   // Only a chat that has been shared needs them.
   const people = useMemo(
     () =>
-      others.length > 0 || role === "member" || botOwner
+      others.length > 0 || role !== "owner" || botOwner
         ? new Map([owner, ...others, ...(botOwner ? [botOwner] : [])].map((p) => [p.id, p]))
         : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [roster, role, botOwner]
   );
 
-  // A shared chat asks every few seconds what the others have written. It
-  // holds off while a reply is streaming here, and only ever takes a longer
-  // chat from the server, never a shorter one: just after a reply streams,
-  // what's on screen is briefly ahead of what's stored.
+  // A shared chat asks every few seconds whether anything has changed (a
+  // small answer: when, and how many messages), and only re-reads the whole
+  // chat, pictures and all, when it has. It holds off while a reply is
+  // streaming here, and only ever takes a longer chat from the server, never
+  // a shorter one: just after a reply streams, what's on screen is briefly
+  // ahead of what's stored.
   const idleRef = useRef(true);
   idleRef.current = streamingText === null && !compacting && !remembering;
+  const headRef = useRef<string | null>(null);
   useEffect(() => {
+    headRef.current = null;
     if (!isShared) return;
     const timer = setInterval(async () => {
       if (!idleRef.current || document.hidden) return;
       try {
+        const head = await getChatHead(chatId);
+        const key = `${head.updated_at}:${head.messages}:${head.last_message_at}:${head.role}`;
+        if (key === headRef.current) return;
         const fresh = await getChat(chatId);
         if (!idleRef.current) return;
+        headRef.current = key;
         setRole(fresh.role);
         setRoster(fresh.roster);
         setMessages((prev) => {
@@ -263,14 +310,18 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   }, [chatId, isShared]);
 
   // Every message re-reads the chat so far (since the last compaction), and
-  // pays for it. Once that's a noticeable amount, offer to compact.
-  const carried = sinceLastSummary(messages).reduce((n, m) => n + estimateMessageTokens(m.content), 0);
+  // pays for it. Once that's a noticeable amount, offer to compact. Worked
+  // out when the messages change, not on every streamed word: it walks the
+  // whole chat's text, pictures included.
+  const { carried, sinceSummary } = useMemo(() => {
+    const since = sinceLastSummary(messages);
+    return { carried: since.reduce((n, m) => n + estimateMessageTokens(m.content), 0), sinceSummary: since.length };
+  }, [messages]);
   const rate = models.find((m) => m.id === chatModel)?.credit_per_million_prompt_tokens ?? 0;
   const carriedCredits = Math.ceil((carried * rate) / 1_000_000);
   // Compacting spends the payer's credits, so it's only offered to them: in
   // someone else's bot the payer is its owner, so not there.
-  const offerCompact =
-    role === "owner" && !botOwner && !isPublic && carried >= config.limits.compact_offer_tokens && streamingText === null && sinceLastSummary(messages).length >= 3;
+  const offerCompact = role === "owner" && !botOwner && !isPublic && carried >= config.limits.compact_offer_tokens && streamingText === null && sinceSummary >= 3;
 
   // Remember: Lechuga folds this chat into what it keeps about you (Account >
   // Memory). Only in a chat nobody else has ever been in, since the memory
@@ -343,8 +394,8 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
                         await deleteSeat(botId, userId);
                         return { roster: (await getChat(chatId)).roster };
                       },
-                      upgrade: async (userId, email) => {
-                        await upgradeSeat(botId, userId, email);
+                      upgrade: async (userId, email, useInvite) => {
+                        await upgradeSeat(botId, userId, email, useInvite);
                         return { roster: (await getChat(chatId)).roster };
                       },
                     }
@@ -379,7 +430,9 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
       />
       {isPublic && (
         <p className="chat-notice chat-bot-note">
-          This chat is public: anyone on Lechuga can read it and join in. Everyone sees who said what. The replies are on Lechuga, not on anyone here.
+          {role === "reader"
+            ? "This chat is public: you can read it, but only the people it's shared with can write in it. The replies are on Lechuga."
+            : "This chat is public: anyone on Lechuga can read it, and only the people it's shared with can write in it. Everyone sees who said what. The replies are on Lechuga, not on anyone here."}
         </p>
       )}
       {related.length > 0 && (
@@ -423,57 +476,59 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
           )}
         </p>
       )}
-      <Composer
-        streaming={streamingText !== null}
-        models={models}
-        selectedModel={chatModel}
-        modelLocked
-        placeholder={`message ${botName}`}
-        onSelectModel={() => {}}
-        acceptsAttachments
-        onSend={(content, attachments) => void send(content, attachments, messages.length === 0)}
-        onStop={() => abortRef.current?.abort()}
-        leading={
-          messages.length > 0 || isShared ? (
-            <div className="composer-people">
-              {/* Who started it is the one wearing the ring, so nothing has to
-                  say so. Past four faces the rest become a +n to hover. */}
-              {isShared && <AvatarStack people={[owner, ...active]} ownerId={owner.id} size={22} max={4} />}
-              {role === "owner" && (
-                <button type="button" className="composer-share-btn" onClick={() => setSharing(true)}>
-                  {isPublic ? "Public" : isShared ? "Sharing" : "Share"}
-                </button>
-              )}
-              {role !== "owner" && isPublic && <span className="composer-public-tag">Public</span>}
-              {/* The chat's address, for anyone already in it. */}
-              <button
-                type="button"
-                className="composer-share-btn"
-                title="Copy a link to this chat. It opens for anyone who's in the chat."
-                onClick={() => {
-                  void copyText(appLink(`/c/${chatId}`)).then(() => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1800);
-                  });
-                }}
-              >
-                {copied ? "Copied" : "Link"}
-              </button>
-              {canRemember && (
+      {role !== "reader" && (
+        <Composer
+          streaming={streamingText !== null}
+          models={models}
+          selectedModel={chatModel}
+          modelLocked
+          placeholder={`message ${botName}`}
+          onSelectModel={() => {}}
+          acceptsAttachments
+          onSend={(content, attachments) => void send(content, attachments, messages.length === 0)}
+          onStop={() => abortRef.current?.abort()}
+          leading={
+            messages.length > 0 || isShared ? (
+              <div className="composer-people">
+                {/* Who started it is the one wearing the ring, so nothing has to
+                    say so. Past four faces the rest become a +n to hover. */}
+                {isShared && <AvatarStack people={[owner, ...active]} ownerId={owner.id} size={22} max={4} />}
+                {role === "owner" && (
+                  <button type="button" className="composer-share-btn" onClick={() => setSharing(true)}>
+                    {isPublic ? "Public" : isShared ? "Sharing" : "Share"}
+                  </button>
+                )}
+                {role !== "owner" && isPublic && <span className="composer-public-tag">Public</span>}
+                {/* The chat's address, for anyone already in it. */}
                 <button
                   type="button"
                   className="composer-share-btn"
-                  onClick={remember}
-                  disabled={remembering}
-                  title="Lechuga reads this chat and updates what it remembers about you for every chat. Costs about one message. See it under Account, then Memory."
+                  title="Copy a link to this chat. It opens for anyone who's in the chat."
+                  onClick={() => {
+                    void copyText(appLink(`/c/${chatId}`)).then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1800);
+                    });
+                  }}
                 >
-                  {remembering ? "Remembering…" : "Remember"}
+                  {copied ? "Copied" : "Link"}
                 </button>
-              )}
-            </div>
-          ) : undefined
-        }
-      />
+                {canRemember && (
+                  <button
+                    type="button"
+                    className="composer-share-btn"
+                    onClick={remember}
+                    disabled={remembering}
+                    title="Lechuga reads this chat and updates what it remembers about you for every chat. Costs about one message. See it under Account, then Memory."
+                  >
+                    {remembering ? "Remembering…" : "Remember"}
+                  </button>
+                )}
+              </div>
+            ) : undefined
+          }
+        />
+      )}
     </div>
   );
 }

@@ -10,10 +10,11 @@ import config from "../config.json";
 
 // Public chats (migration 0017; the visibility column is from 0003). The
 // person who started a chat can make it public: from then on anyone signed
-// in can read it and join in, and its replies are paid for by the house
-// account below, not by them. Once public it can't go private again (the
-// words are out), though the owner can still delete it. Only a chat with
-// your own bot can go public, and not with a guarded one.
+// in can read it, and its replies are paid for by the house account below,
+// not by them. Writing in it stays with the owner and the people they've
+// shared it with (sharing.ts); everyone else is a reader. It can be made
+// private again. Only a chat with your own bot can go public, and not with
+// a guarded one.
 //
 // The house account is an ordinary account, @lechuga (a reserved name), so
 // the ledger, the admin pages and the balance all work as they do for
@@ -113,8 +114,11 @@ export async function relatedPublic(env: Env, text: string, excludeChatId: strin
 }
 
 // The first answer in a public chat, cut short, for the model to lean on.
+// Only an answer the model wrote here (one that was charged): a reply the
+// chat's owner brought in from the home page's trial (chat.ts, import) is
+// text they typed, and doesn't get handed to other people's replies.
 export async function firstAnswer(env: Env, chatId: string): Promise<string | null> {
-  const row = await env.DB.prepare("SELECT content FROM messages WHERE chat_id = ? AND role = 'assistant' ORDER BY created_at ASC LIMIT 1")
+  const row = await env.DB.prepare("SELECT content FROM messages WHERE chat_id = ? AND role = 'assistant' AND credits IS NOT NULL ORDER BY created_at ASC LIMIT 1")
     .bind(chatId)
     .first<{ content: string }>();
   return row ? row.content.slice(0, PUBLIC.bring_in_chars) : null;
@@ -156,7 +160,7 @@ publicChats.get("/bots", async (c) => {
 publicChats.post("/bots/:id/public", async (c) => {
   const userId = c.get("userId");
   if (c.get("seatOf")) return c.json({ error: "not available on this account" }, 403);
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   if (access.role !== "owner") return c.json({ error: "only the bot's owner can make it public" }, 403);
   const bot = access.bot;
@@ -232,7 +236,8 @@ publicChats.get("/chats", async (c) => {
 });
 
 // Point someone at a public chat or bot: an email with the link, from
-// whoever owns the thing. Nothing else happens; public is everyone's. The
+// whoever owns the thing. Nothing else happens; public is everyone's to
+// read (to let them write in a chat, share it with them instead). The
 // person needs an account already (Lechuga is invite only), so a username
 // or an address that has one.
 async function pointer(c: Context<AppEnv>, what: "chat" | "bot", title: string, url: string, ownerId: string) {
@@ -246,7 +251,10 @@ async function pointer(c: Context<AppEnv>, what: "chat" | "bot", title: string, 
     const email = normalizeEmail(who);
     if (!email) return c.json({ error: "that doesn't look like an email address" }, 400);
     target = await c.env.DB.prepare("SELECT id, email FROM user WHERE lower(email) = ? AND seat_of IS NULL").bind(email).first<{ id: string; email: string }>();
-    if (!target) return c.json({ error: "that address doesn't have a Lechuga account yet; invite them first, from the menu behind your name" }, 404);
+    // The same answer whether or not the address has an account, so this
+    // can't be used to find out who's on Lechuga. Nothing is sent to an
+    // address that isn't.
+    if (!target) return c.json({ ok: true, sentTo: who, unknown: true });
   } else {
     target = await c.env.DB.prepare("SELECT id, email FROM user WHERE lower(username) = ? AND seat_of IS NULL").bind(who.toLowerCase()).first<{ id: string; email: string }>();
     if (!target) return c.json({ error: `nobody here goes by @${who}` }, 404);
@@ -271,14 +279,10 @@ publicChats.post("/bots/:id/invite", async (c) => {
   return pointer(c, "bot", access.bot.name, `${c.env.BASE_URL}/b/${access.bot.id}`, access.bot.user_id);
 });
 
-// Private again, for a chat: the people who joined it while it was public
-// (they added themselves) lose sight of it; anyone the owner shared it with
-// on purpose keeps it. What anyone wrote stays.
+// Private again, for a chat: everyone else stops being able to read it;
+// the people the owner shared it with keep it. What anyone wrote stays.
 async function chatPrivate(env: Env, chatId: string, now: number): Promise<D1PreparedStatement[]> {
-  return [
-    env.DB.prepare("UPDATE chats SET visibility = 'private', updated_at = ? WHERE id = ?").bind(now, chatId),
-    env.DB.prepare("UPDATE chat_members SET removed_at = ? WHERE chat_id = ? AND removed_at IS NULL AND added_by = user_id").bind(now, chatId),
-  ];
+  return [env.DB.prepare("UPDATE chats SET visibility = 'private', updated_at = ? WHERE id = ?").bind(now, chatId)];
 }
 
 publicChats.post("/chats/:id/private", async (c) => {
@@ -299,7 +303,7 @@ publicChats.post("/chats/:id/private", async (c) => {
 // people from the bot's sharing, or delete the chats.
 publicChats.post("/bots/:id/private", async (c) => {
   const userId = c.get("userId");
-  const access = await botAccess(c.env, c.req.param("id"), userId);
+  const access = await botAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   if (access.role !== "owner") return c.json({ error: "only the bot's owner can make it private" }, 403);
   const bot = access.bot;
@@ -324,7 +328,7 @@ publicChats.post("/bots/:id/private", async (c) => {
 publicChats.post("/chats/:id/public", async (c) => {
   const userId = c.get("userId");
   if (c.get("seatOf")) return c.json({ error: "not available on this account" }, 403);
-  const access = await chatAccess(c.env, c.req.param("id"), userId);
+  const access = await chatAccess(c.env, c.req.param("id"), userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
   const chat = access.chat;
   if (chat.user_id !== userId) return c.json({ error: "only the person who started a chat can make it public" }, 403);
