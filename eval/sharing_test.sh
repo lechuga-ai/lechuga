@@ -10,6 +10,8 @@
 # One check sends a real message (the friend typing in the owner's chat), so
 # it costs us a fraction of a cent at the gateway. The throwaway addresses are
 # Resend's test inbox, so the "shared with you" email goes nowhere real.
+# Making the chat public creates the house account (@lechuga) in the local
+# database if it isn't there yet; that's left in place.
 #   eval/sharing_test.sh                      (needs a local `npm run dev`)
 #   BASE_URL=http://localhost:8799 eval/sharing_test.sh
 set -euo pipefail
@@ -131,6 +133,19 @@ OWNER_NOW=$(balance "$OWNER_ID")
 check "owner was charged" "yes" "$([[ "$OWNER_NOW" -lt 5000 ]] && echo yes || echo "no, still $OWNER_NOW")"
 check "friend wasn't" 0 "$(balance "$FRIEND_ID")"
 check "the turn is the friend's" "$FRIEND_ID" "$(as "$OWNER" "$BASE_URL/api/chats/$CHAT" | pick "[m for m in d['messages'] if m['role']=='user'][0]['user_id']")"
+
+echo "=== public: everyone reads, only the people in it write ==="
+check "a member can't make it public" 403 "$(status "$FRIEND" -X POST "$BASE_URL/api/public/chats/$CHAT/public")"
+check "owner makes it public" 200 "$(status "$OWNER" -X POST "$BASE_URL/api/public/chats/$CHAT/public")"
+check "stranger can read it now, as a reader" "reader" "$(as "$STRANGER" "$BASE_URL/api/chats/$CHAT" | pick "d['role']")"
+check "but can't type in it" 403 "$(status "$STRANGER" -X POST "$BASE_URL/api/chats/$CHAT/messages" -d '{"content":"hi"}')"
+check "or share it on" 403 "$(status "$STRANGER" -X POST "$BASE_URL/api/chats/$CHAT/members" -d "$SELF")"
+check "and it isn't in the stranger's list" 0 "$(as "$STRANGER" "$BASE_URL/api/chats" | pick "len([c for c in d if c['id']=='$CHAT'])")"
+check "the friend is still a member" "member" "$(as "$FRIEND" "$BASE_URL/api/chats/$CHAT" | pick "d['role']")"
+check "and still can't share it on" 403 "$(status "$FRIEND" -X POST "$BASE_URL/api/chats/$CHAT/members" -d "{\"who\":\"@sharetest_s_$RUN\"}")"
+check "owner makes it private again" 200 "$(status "$OWNER" -X POST "$BASE_URL/api/public/chats/$CHAT/private")"
+check "stranger is out" 404 "$(status "$STRANGER" "$BASE_URL/api/chats/$CHAT")"
+check "the friend keeps it" "member" "$(as "$FRIEND" "$BASE_URL/api/chats/$CHAT" | pick "d['role']")"
 
 echo "=== removing someone ==="
 check "owner removes the friend" 200 "$(status "$OWNER" -X DELETE "$BASE_URL/api/chats/$CHAT/members/$FRIEND_ID")"

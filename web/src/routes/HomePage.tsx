@@ -76,7 +76,7 @@ export const HOME_SECTIONS: Section[] = [
       {
         lead: "Everyone on Lechuga",
         text:
-          "means public: anyone signed in can read it and join in, it's listed under Public in the menu behind your name, and the replies come out of Lechuga's credits rather than yours. Your name is on it. A public bot makes every chat with it public, the ones so far included. Public can be undone from the same place.",
+          "means public: anyone signed in can read it, it's listed under Public in the menu behind your name, and the replies come out of Lechuga's credits rather than yours. Only you and the people you've chosen can write in a public chat. Your name is on it. A public bot makes every chat with it public, the ones so far included. Public can be undone from the same place.",
       },
     ],
   },

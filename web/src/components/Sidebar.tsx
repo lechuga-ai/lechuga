@@ -164,11 +164,8 @@ export function Sidebar({
   // Never lose a chat: one whose bot isn't in the list (the bots didn't
   // load, or a row points somewhere odd) still shows, under a plain heading.
   const orphans = chats.filter((c) => c.user_id === me.id && botOf(c) === null);
-  // Chats others started and let me into, one at a time; and the public
-  // ones I've joined, apart.
-  const notMine = chats.filter((c) => c.user_id !== me.id && !bots.some((b) => inGroup(c, b)));
-  const sharedWithMe = notMine.filter((c) => c.visibility !== "public");
-  const publicJoined = notMine.filter((c) => c.visibility === "public");
+  // Chats others started and let me into, public or not.
+  const sharedWithMe = chats.filter((c) => c.user_id !== me.id && !bots.some((b) => inGroup(c, b)));
 
   function chatRow(chat: Chat & { snippet?: string | null }) {
     return (
@@ -363,14 +360,6 @@ export function Sidebar({
               <span className="bot-row-name">Shared with me</span>
             </div>
             {sharedWithMe.map((chat) => chatRow(chat))}
-          </div>
-        )}
-        {!searching && publicJoined.length > 0 && (
-          <div className="bot-group shared">
-            <div className="bot-row">
-              <span className="bot-row-name">Public chats I've joined</span>
-            </div>
-            {publicJoined.map((chat) => chatRow(chat))}
           </div>
         )}
       </div>

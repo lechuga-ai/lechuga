@@ -114,8 +114,9 @@ export type ChatRow = {
   // The bot the chat is with. Null only on a row from before bots, which
   // botFor() reads as the owner's Seed.
   bot_id: string | null;
-  // 'public': anyone signed in can read and join it, and the house account
-  // pays (public.ts). slug is reserved, unused.
+  // 'public': anyone signed in can read it, only the owner and the people
+  // it's shared with write in it, and the house account pays (public.ts).
+  // slug is reserved, unused.
   visibility: "private" | "public";
   slug: string | null;
   title: string | null;

@@ -8,7 +8,9 @@ import config from "../config.json";
 // Shared chats. A chat has one owner (chats.user_id), who is the only one who
 // can share it, remove people, compact it or delete it, and who pays for every
 // reply in it. Members (chat_members, removed_at IS NULL) can read all of it
-// and keep it going. See 0009_sharing.sql.
+// and keep it going; they can't share it on. See 0009_sharing.sql. A public
+// chat (public.ts) adds readers: anyone signed in can read it, but only the
+// owner and the members write in it.
 
 // What the app shows of another account: enough for a face and a name, and
 // never the email address. photo is the avatar's version (its updated_at), for
@@ -22,29 +24,35 @@ export type Roster = {
   pending: { id: string; email: string }[];
 };
 
-export type ChatRole = "owner" | "member";
+// owner: started it, or owns the bot it's with. member: was added by the
+// owner, and can read and write. reader: can see it only because it's
+// public, and can't write in it.
+export type ChatRole = "owner" | "member" | "reader";
 
 // A chat that exists but isn't yours looks identical to one that doesn't
 // exist (null either way), so ids can't be probed. Four ways in: it's
 // mine, I've been added to it, it's with a bot I own (bots.ts: the owner of
 // a shared bot sees every chat with it, pays for them, and can do
 // everything its starter can), or it's public (public.ts: anyone signed in
-// may read and join).
+// may read it, and that's all).
 // seat: the caller is a username-and-code account (seats.ts), which keeps
 // to the bots it was given: no public chats.
 export async function chatAccess(env: Env, chatId: string, userId: string, seat = false): Promise<{ chat: ChatRow; role: ChatRole } | null> {
-  const chat = await env.DB.prepare(
-    `SELECT c.* FROM chats c WHERE c.id = ?1 AND (c.user_id = ?2
+  const row = await env.DB.prepare(
+    `SELECT c.*,
+       EXISTS (SELECT 1 FROM chat_members m WHERE m.chat_id = c.id AND m.user_id = ?2 AND m.removed_at IS NULL) AS is_member,
+       EXISTS (SELECT 1 FROM bots b WHERE b.id = c.bot_id AND b.user_id = ?2) AS owns_bot
+     FROM chats c WHERE c.id = ?1 AND (c.user_id = ?2
        OR (c.visibility = 'public' AND ?3 = 0)
        OR EXISTS (SELECT 1 FROM chat_members m WHERE m.chat_id = c.id AND m.user_id = ?2 AND m.removed_at IS NULL)
        OR EXISTS (SELECT 1 FROM bots b WHERE b.id = c.bot_id AND b.user_id = ?2))`
   )
     .bind(chatId, userId, seat ? 1 : 0)
-    .first<ChatRow>();
-  if (!chat) return null;
-  if (chat.user_id === userId) return { chat, role: "owner" };
-  const ownsBot = chat.bot_id ? await env.DB.prepare("SELECT 1 AS one FROM bots WHERE id = ? AND user_id = ?").bind(chat.bot_id, userId).first() : null;
-  return { chat, role: ownsBot ? "owner" : "member" };
+    .first<ChatRow & { is_member: number; owns_bot: number }>();
+  if (!row) return null;
+  const { is_member, owns_bot, ...chat } = row;
+  if (chat.user_id === userId || owns_bot) return { chat, role: "owner" };
+  return { chat, role: is_member ? "member" : "reader" };
 }
 
 export async function peopleByIds(env: Env, ids: string[]): Promise<Map<string, Person>> {

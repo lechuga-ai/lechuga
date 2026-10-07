@@ -5,7 +5,8 @@ import { Avatar } from "../components/Avatar";
 import { listPublicBots, listPublicChats, type PublicBotSummary, type PublicChatSummary } from "../api";
 
 // /public: every public chat, newest first, with a box to search them all.
-// Open one and you can read it and join in; the replies are on Lechuga.
+// Open one and you can read it; the people it's shared with write in it,
+// and the replies are on Lechuga.
 export function PublicPage() {
   const [query, setQuery] = useState("");
   const [chats, setChats] = useState<PublicChatSummary[] | null>(null);
@@ -31,9 +32,9 @@ export function PublicPage() {
   return (
     <SideNavPage title="Public" nav={[{ to: "/public", label: "Public" }]} navLabel="Public">
       <p className="settings-lead">
-        Bots and chats their owners have opened to everyone on Lechuga. Chat with a public bot, or read any public chat and join in: the replies
-        come out of Lechuga's own credits, not yours or theirs, and everyone sees who said what. To open one of your own, use Share on the bot or
-        the chat.
+        Bots and chats their owners have opened to everyone on Lechuga. Chat with a public bot, or read any public chat: only the people it's
+        shared with write in it, the replies come out of Lechuga's own credits, not yours or theirs, and everyone sees who said what. To open one
+        of your own, use Share on the bot or the chat.
       </p>
       <input
         className="chat-search public-search"

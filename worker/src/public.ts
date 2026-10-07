@@ -10,10 +10,11 @@ import config from "../config.json";
 
 // Public chats (migration 0017; the visibility column is from 0003). The
 // person who started a chat can make it public: from then on anyone signed
-// in can read it and join in, and its replies are paid for by the house
-// account below, not by them. Once public it can't go private again (the
-// words are out), though the owner can still delete it. Only a chat with
-// your own bot can go public, and not with a guarded one.
+// in can read it, and its replies are paid for by the house account below,
+// not by them. Writing in it stays with the owner and the people they've
+// shared it with (sharing.ts); everyone else is a reader. It can be made
+// private again. Only a chat with your own bot can go public, and not with
+// a guarded one.
 //
 // The house account is an ordinary account, @lechuga (a reserved name), so
 // the ledger, the admin pages and the balance all work as they do for
@@ -232,7 +233,8 @@ publicChats.get("/chats", async (c) => {
 });
 
 // Point someone at a public chat or bot: an email with the link, from
-// whoever owns the thing. Nothing else happens; public is everyone's. The
+// whoever owns the thing. Nothing else happens; public is everyone's to
+// read (to let them write in a chat, share it with them instead). The
 // person needs an account already (Lechuga is invite only), so a username
 // or an address that has one.
 async function pointer(c: Context<AppEnv>, what: "chat" | "bot", title: string, url: string, ownerId: string) {
@@ -271,14 +273,10 @@ publicChats.post("/bots/:id/invite", async (c) => {
   return pointer(c, "bot", access.bot.name, `${c.env.BASE_URL}/b/${access.bot.id}`, access.bot.user_id);
 });
 
-// Private again, for a chat: the people who joined it while it was public
-// (they added themselves) lose sight of it; anyone the owner shared it with
-// on purpose keeps it. What anyone wrote stays.
+// Private again, for a chat: everyone else stops being able to read it;
+// the people the owner shared it with keep it. What anyone wrote stays.
 async function chatPrivate(env: Env, chatId: string, now: number): Promise<D1PreparedStatement[]> {
-  return [
-    env.DB.prepare("UPDATE chats SET visibility = 'private', updated_at = ? WHERE id = ?").bind(now, chatId),
-    env.DB.prepare("UPDATE chat_members SET removed_at = ? WHERE chat_id = ? AND removed_at IS NULL AND added_by = user_id").bind(now, chatId),
-  ];
+  return [env.DB.prepare("UPDATE chats SET visibility = 'private', updated_at = ? WHERE id = ?").bind(now, chatId)];
 }
 
 publicChats.post("/chats/:id/private", async (c) => {

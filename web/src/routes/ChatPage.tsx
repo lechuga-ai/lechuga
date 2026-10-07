@@ -40,7 +40,8 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   const [botOwner, setBotOwner] = useState<Person | null>(null);
   // The chat's bot, for making a username-and-code account from here.
   const [botId, setBotId] = useState<string | null>(null);
-  // Public: anyone can read and join; Lechuga pays. Set from the chat row.
+  // Public: anyone can read it, only the people it's shared with write in
+  // it, and Lechuga pays. Set from the chat row.
   const [isPublic, setIsPublic] = useState(false);
   // "Asked before": public chats that opened with this chat's first words.
   const [related, setRelated] = useState<{ id: string; title: string | null }[]>([]);
@@ -54,8 +55,9 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   // The Link button's brief thank-you.
   const [copied, setCopied] = useState(false);
   // Whose chat this is and who's in it. A chat made a moment ago on the start
-  // page is mine and has nobody else in it yet.
-  const [role, setRole] = useState<"owner" | "member">("owner");
+  // page is mine and has nobody else in it yet. A reader can only see it
+  // because it's public: no box to type in.
+  const [role, setRole] = useState<"owner" | "member" | "reader">("owner");
   const [roster, setRoster] = useState<Roster | null>(null);
   const [sharing, setSharing] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
@@ -215,12 +217,12 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
   const owner = roster?.owner ?? mePerson;
   const others = roster?.members ?? [];
   const active = others.filter((m) => !m.removed);
-  const isShared = role === "member" || active.length > 0;
+  const isShared = role !== "owner" || active.length > 0;
   // Everyone who has ever typed here, for the names over their messages.
   // Only a chat that has been shared needs them.
   const people = useMemo(
     () =>
-      others.length > 0 || role === "member" || botOwner
+      others.length > 0 || role !== "owner" || botOwner
         ? new Map([owner, ...others, ...(botOwner ? [botOwner] : [])].map((p) => [p.id, p]))
         : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -379,7 +381,9 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
       />
       {isPublic && (
         <p className="chat-notice chat-bot-note">
-          This chat is public: anyone on Lechuga can read it and join in. Everyone sees who said what. The replies are on Lechuga, not on anyone here.
+          {role === "reader"
+            ? "This chat is public: you can read it, but only the people it's shared with can write in it. The replies are on Lechuga."
+            : "This chat is public: anyone on Lechuga can read it, and only the people it's shared with can write in it. Everyone sees who said what. The replies are on Lechuga, not on anyone here."}
         </p>
       )}
       {related.length > 0 && (
@@ -423,57 +427,59 @@ export function ChatPage({ me, models, expectedModel, expectedBotName, onFirstMe
           )}
         </p>
       )}
-      <Composer
-        streaming={streamingText !== null}
-        models={models}
-        selectedModel={chatModel}
-        modelLocked
-        placeholder={`message ${botName}`}
-        onSelectModel={() => {}}
-        acceptsAttachments
-        onSend={(content, attachments) => void send(content, attachments, messages.length === 0)}
-        onStop={() => abortRef.current?.abort()}
-        leading={
-          messages.length > 0 || isShared ? (
-            <div className="composer-people">
-              {/* Who started it is the one wearing the ring, so nothing has to
-                  say so. Past four faces the rest become a +n to hover. */}
-              {isShared && <AvatarStack people={[owner, ...active]} ownerId={owner.id} size={22} max={4} />}
-              {role === "owner" && (
-                <button type="button" className="composer-share-btn" onClick={() => setSharing(true)}>
-                  {isPublic ? "Public" : isShared ? "Sharing" : "Share"}
-                </button>
-              )}
-              {role !== "owner" && isPublic && <span className="composer-public-tag">Public</span>}
-              {/* The chat's address, for anyone already in it. */}
-              <button
-                type="button"
-                className="composer-share-btn"
-                title="Copy a link to this chat. It opens for anyone who's in the chat."
-                onClick={() => {
-                  void copyText(appLink(`/c/${chatId}`)).then(() => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1800);
-                  });
-                }}
-              >
-                {copied ? "Copied" : "Link"}
-              </button>
-              {canRemember && (
+      {role !== "reader" && (
+        <Composer
+          streaming={streamingText !== null}
+          models={models}
+          selectedModel={chatModel}
+          modelLocked
+          placeholder={`message ${botName}`}
+          onSelectModel={() => {}}
+          acceptsAttachments
+          onSend={(content, attachments) => void send(content, attachments, messages.length === 0)}
+          onStop={() => abortRef.current?.abort()}
+          leading={
+            messages.length > 0 || isShared ? (
+              <div className="composer-people">
+                {/* Who started it is the one wearing the ring, so nothing has to
+                    say so. Past four faces the rest become a +n to hover. */}
+                {isShared && <AvatarStack people={[owner, ...active]} ownerId={owner.id} size={22} max={4} />}
+                {role === "owner" && (
+                  <button type="button" className="composer-share-btn" onClick={() => setSharing(true)}>
+                    {isPublic ? "Public" : isShared ? "Sharing" : "Share"}
+                  </button>
+                )}
+                {role !== "owner" && isPublic && <span className="composer-public-tag">Public</span>}
+                {/* The chat's address, for anyone already in it. */}
                 <button
                   type="button"
                   className="composer-share-btn"
-                  onClick={remember}
-                  disabled={remembering}
-                  title="Lechuga reads this chat and updates what it remembers about you for every chat. Costs about one message. See it under Account, then Memory."
+                  title="Copy a link to this chat. It opens for anyone who's in the chat."
+                  onClick={() => {
+                    void copyText(appLink(`/c/${chatId}`)).then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 1800);
+                    });
+                  }}
                 >
-                  {remembering ? "Remembering…" : "Remember"}
+                  {copied ? "Copied" : "Link"}
                 </button>
-              )}
-            </div>
-          ) : undefined
-        }
-      />
+                {canRemember && (
+                  <button
+                    type="button"
+                    className="composer-share-btn"
+                    onClick={remember}
+                    disabled={remembering}
+                    title="Lechuga reads this chat and updates what it remembers about you for every chat. Costs about one message. See it under Account, then Memory."
+                  >
+                    {remembering ? "Remembering…" : "Remember"}
+                  </button>
+                )}
+              </div>
+            ) : undefined
+          }
+        />
+      )}
     </div>
   );
 }

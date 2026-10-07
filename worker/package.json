@@ -62,6 +62,9 @@
     "db:migrate:local:0018": "wrangler d1 execute lechuga-dev --local --file=src/db/0018_public_bots.sql",
     "db:migrate:dev:0018": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0018_public_bots.sql",
     "db:migrate:prod:0018": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0018_public_bots.sql",
+    "db:migrate:local:0019": "wrangler d1 execute lechuga-dev --local --file=src/db/0019_public_readers.sql",
+    "db:migrate:dev:0019": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/0019_public_readers.sql",
+    "db:migrate:prod:0019": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/0019_public_readers.sql",
     "db:check:local": "wrangler d1 execute lechuga-dev --local --file=src/db/check_balances.sql",
     "db:check:dev": "wrangler d1 execute lechuga-dev --env dev --remote --file=src/db/check_balances.sql",
     "db:check:prod": "wrangler d1 execute lechuga-prod --env prod --remote --file=src/db/check_balances.sql"

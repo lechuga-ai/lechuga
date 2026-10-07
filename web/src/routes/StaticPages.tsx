@@ -84,6 +84,22 @@ type NewsEntry = { date: string; title: string; intro: string; items: { lead: st
 
 const NEWS: NewsEntry[] = [
   {
+    date: "October 6, 2026",
+    title: "Public chats: everyone reads, the people you chose write",
+    intro:
+      "A public chat is still everyone's to read, and Lechuga still pays for its replies. Writing in it is now for you and the people you've shared it with, and nobody else.",
+    items: [
+      {
+        lead: "Readers and writers.",
+        text: "Anyone signed in can open a public chat and read it, but the box to type in is only there for the people it's shared with. Share, on the chat, shows those people under Everyone on Lechuga now, so you can add or remove them while it stays public. The people you share with can't share it on.",
+      },
+      {
+        lead: "Chats that were already public.",
+        text: "People who had joined one by typing in it are readers from now on; what they wrote keeps their name. Add them back from Share if you want them writing.",
+      },
+    ],
+  },
+  {
     date: "October 1, 2026",
     title: "Sharing: one setting, three choices",
     intro:
@@ -103,11 +119,11 @@ const NEWS: NewsEntry[] = [
       },
       {
         lead: "Everyone on Lechuga.",
-        text: "Public. Anyone signed in can read the chat and join in, or chat with the bot, and the replies come out of Lechuga's credits rather than yours. Your name is on it. A public bot makes every chat with it public, the ones so far included. Not a guarded bot, and not a bot you've shared with people. Choose Only me or People you choose later and it's private again; people who joined lose sight of it.",
+        text: "Public. Anyone signed in can read the chat, or chat with the bot, and the replies come out of Lechuga's credits rather than yours. In a public chat, only you and the people you've chosen can write; everyone else reads. Your name is on it. A public bot makes every chat with it public, the ones so far included. Not a guarded bot, and not a bot you've shared with people. Choose Only me or People you choose later and it's private again.",
       },
       {
         lead: "Finding what's public.",
-        text: "The search box on the left finds public chats along with yours. Public, in the menu behind your name, lists every public bot and chat, newest first. A public chat you've typed in joins your list; a public bot you've chatted with joins your bots. Tell someone about a public thing from its Share, and they get the link by email.",
+        text: "The search box on the left finds public chats along with yours. Public, in the menu behind your name, lists every public bot and chat, newest first. A public bot you've chatted with joins your bots. Tell someone about a public thing from its Share, and they get the link by email.",
       },
       {
         lead: "Asked before.",

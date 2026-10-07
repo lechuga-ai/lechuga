@@ -19,7 +19,8 @@ export type Chat = {
   user_id: string;
   // The bot it's with (null only on a chat from before bots: the owner's Seed).
   bot_id: string | null;
-  // 'public': anyone signed in can read and join it; Lechuga pays.
+  // 'public': anyone signed in can read it; only the owner and the people
+  // it's shared with write in it; Lechuga pays.
   visibility: "private" | "public";
   title: string | null;
   model: string;
@@ -150,7 +151,7 @@ export async function createChat(model?: string, bot?: string): Promise<{ id: st
 // bot.owner is set when the chat is with someone else's bot: they can see it.
 export async function getChat(
   id: string
-): Promise<{ chat: Chat; messages: Message[]; role: "owner" | "member"; roster: Roster; bot: { id: string; name: string; owner: Person | null } }> {
+): Promise<{ chat: Chat; messages: Message[]; role: "owner" | "member" | "reader"; roster: Roster; bot: { id: string; name: string; owner: Person | null } }> {
   return expectJson(await apiFetch(`/api/chats/${id}`));
 }
 
@@ -205,7 +206,8 @@ export async function deleteSeat(botId: string, userId: string): Promise<{ roste
 }
 
 // Public chats (worker/src/public.ts): the browse page's list, and making
-// one of mine public, which is for keeps.
+// one of mine public: anyone can read it, the people I've shared it with
+// go on writing in it, and Lechuga pays.
 export type PublicChatSummary = { id: string; title: string | null; owner: Person; updated_at: number; messages: number; snippet?: string | null };
 
 export async function listPublicChats(q = ""): Promise<PublicChatSummary[]> {
@@ -223,9 +225,9 @@ export async function listPublicBots(q = ""): Promise<PublicBotSummary[]> {
   return expectJson(await apiFetch(`/api/public/bots${q ? `?q=${encodeURIComponent(q)}` : ""}`));
 }
 
-// Private again. A chat: the people who joined it lose sight of it. A bot:
-// the bot and every chat with it; people who started chats with it keep
-// those, as members of the bot.
+// Private again. A chat: everyone else stops being able to read it; the
+// people it's shared with keep it. A bot: the bot and every chat with it;
+// people who started chats with it keep those, as members of the bot.
 export async function makePrivate(kind: "chat" | "bot", id: string): Promise<void> {
   await expectJson(await apiFetch(`/api/public/${kind}s/${id}/private`, { method: "POST" }));
 }

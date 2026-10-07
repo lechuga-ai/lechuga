@@ -257,6 +257,9 @@ chat.post("/chats/:id/messages", async (c) => {
   const userId = c.get("userId");
   const access = await chatAccess(c.env, chatId, userId, c.get("seatOf") !== null);
   if (!access) return c.json({ error: "not found" }, 404);
+  // A public chat is everyone's to read, but only the owner and the people
+  // they've shared it with write in it (sharing.ts).
+  if (access.role === "reader") return c.json({ error: "this chat is public to read, but only the people it's shared with can write in it" }, 403);
   const chatRow = access.chat;
   const bot = await botFor(c.env, chatRow);
   const isPublic = chatRow.visibility === "public";
@@ -349,14 +352,6 @@ chat.post("/chats/:id/messages", async (c) => {
       "INSERT INTO messages (id, chat_id, role, content, user_id, created_at) VALUES (?, ?, 'user', ?, ?, ?)"
     ).bind(crypto.randomUUID(), chatId, content, userId, now),
     c.env.DB.prepare("UPDATE chats SET updated_at = ? WHERE id = ?").bind(now, chatId),
-    // Typing in a public chat joins it: it's in your list from here on.
-    ...(isPublic && chatRow.user_id !== userId
-      ? [
-          c.env.DB.prepare(
-            "INSERT INTO chat_members (chat_id, user_id, added_by, added_at) VALUES (?1, ?2, ?2, ?3) ON CONFLICT(chat_id, user_id) DO UPDATE SET removed_at = NULL"
-          ).bind(chatId, userId, now),
-        ]
-      : []),
   ]);
 
   const { results: fullHistory } = await c.env.DB.prepare(

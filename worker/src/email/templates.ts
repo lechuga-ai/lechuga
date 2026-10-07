@@ -158,14 +158,14 @@ export function seatUpgradedEmail(opts: { sharerName: string; username: string; 
 }
 
 // Someone pointing a person at a public chat or bot. No membership comes
-// of it: public is everyone's already.
+// of it: public is everyone's to read already.
 export function publicPointerEmail(opts: { sharerName: string; what: "chat" | "bot"; title: string; url: string }): EmailContent {
   return {
     subject: `${opts.sharerName} thought you'd like a ${opts.what} on Lechuga`,
     text: [
       `${opts.sharerName} sent you a public ${opts.what} on Lechuga: "${opts.title}".`,
       "",
-      opts.what === "chat" ? "Anyone on Lechuga can read it and join in; the replies are on Lechuga." : "Anyone on Lechuga can chat with it; every chat with it is public, and the replies are on Lechuga.",
+      opts.what === "chat" ? "Anyone on Lechuga can read it; the replies are on Lechuga." : "Anyone on Lechuga can chat with it; every chat with it is public, and the replies are on Lechuga.",
       "",
       opts.url,
     ].join("\n"),
