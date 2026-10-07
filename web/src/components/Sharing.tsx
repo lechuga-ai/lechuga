@@ -6,12 +6,13 @@ import { SEAT_DOMAIN } from "../../../worker/src/seat-email";
 
 // Sharing, as a setting with three levels, the same for a chat and a bot:
 // only me; people I choose, by username or email, or a username and a code
-// I make for someone without an email; everyone on Lechuga. Picking a
-// level shows what it means and who it affects; nothing changes until
-// Done, which asks once. Adding or removing a person happens at once, and
-// anything that takes access away asks first, inside the dialog. A public
-// chat keeps its people: they're the ones who write in it, so they're
-// shown and editable under Everyone too. The thing
+// I make for someone without an email; everyone on Lechuga. The levels are
+// three flat rows; what the picked one needs (who has it, the link) is a
+// section below them, and one line above Done says what Done will do.
+// Nothing changes until Done, which asks once. Adding or removing a person
+// happens at once, and anything that takes access away asks first, inside
+// the dialog. A public chat keeps its people: they're the ones who write
+// in it, so they're shown and editable under Everyone too. The thing
 // being shared is behind a small adapter (SharingTarget), so this one
 // panel serves the chat's Share button, a bot's Share… and the Sharing
 // section in Bot Manager.
@@ -73,6 +74,7 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
   const [upgrading, setUpgrading] = useState<Member | null>(null);
   const [upgradeEmail, setUpgradeEmail] = useState("");
   const [tell, setTell] = useState("");
+  const [tellOpen, setTellOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   // The question being asked before something that takes access away.
   const [confirm, setConfirm] = useState<Confirm | null>(null);
@@ -163,6 +165,7 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
       const r = await sendPublicPointer(t.kind, t.id, entered);
       setNote(`Sent to ${r.sentTo}.`);
       setTell("");
+      setTellOpen(false);
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -319,23 +322,79 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
     );
   }
 
-  const peopleSummary =
-    count === 0
-      ? "Nobody yet."
-      : [
-          others.length > 0 ? `${others.length} ${others.length === 1 ? "person" : "people"}` : null,
-          juniors.length > 0 ? `${juniors.length} username-and-code ${juniors.length === 1 ? "account" : "accounts"}` : null,
-          pending.length > 0 ? `${pending.length} waiting to sign up` : null,
-        ]
-          .filter(Boolean)
-          .join(", ") + ".";
   const changed = level !== current && !(level === "people" && current === "me");
 
-  // Adding and removing people, and the username-and-code accounts. Under
-  // People I choose, and under Everyone while a chat is public, since the
-  // people chosen are the ones who write in it.
-  const peopleEditor = (
-    <>
+  // What Done will do, in one line above it, when the pick isn't the level
+  // in force. The people it mentions are listed in the section above.
+  const next = !changed
+    ? null
+    : level === "everyone"
+      ? `Press Done to make ${thing} public. You'll be asked first.`
+      : level === "people"
+        ? t.kind === "chat"
+          ? `Press Done to make this chat private again: everyone else stops reading${count > 0 ? "; the people above keep it" : ""}.`
+          : `Press Done to make ${t.name} private again.`
+        : t.isPublic
+          ? `Press Done to make ${thing} private again${t.kind === "chat" && count > 0 ? "; the people above lose it too" : ""}.`
+          : `Press Done to stop sharing ${thing}; the people above lose it.`;
+
+  // Who has it: the list, then a way to add someone, then the username-and-
+  // code offer. Under People I choose, and under Everyone while a chat is
+  // public, since the people chosen are the ones who write in it.
+  const peopleEditor = (title: string) => (
+    <section className="sharing-section">
+      <h4>{title}</h4>
+      {count > 0 && (
+        <ul className="share-people">
+          {active.map((p) => (
+            <li key={p.id}>
+              <Avatar person={p} size={26} />
+              <span className="share-name">
+                {p.name}
+                {p.seat && <span className="share-state"> · username and code</span>}
+              </span>
+              {p.seat && p.username && (
+                <button type="button" className="signin-link" disabled={busy} title="Copy a link that signs them in and lands here" onClick={() => void copyText(seatLink(path, p.username!))}>
+                  link
+                </button>
+              )}
+              {p.seat && t.seats && (
+                <>
+                  <button type="button" className="signin-link" disabled={busy} onClick={() => askNewCode(p)}>
+                    new code
+                  </button>
+                  <button
+                    type="button"
+                    className="signin-link"
+                    disabled={busy}
+                    onClick={() => {
+                      setError(null);
+                      setUpgrading(p);
+                    }}
+                  >
+                    full account
+                  </button>
+                </>
+              )}
+              <button type="button" className="signin-link" disabled={busy} onClick={() => askRemove(p)}>
+                remove
+              </button>
+            </li>
+          ))}
+          {pending.map((p) => (
+            <li key={p.id}>
+              <span className="avatar more" style={{ width: 26, height: 26, fontSize: 12 }}>
+                ?
+              </span>
+              <span className="share-name">{p.email}</span>
+              <span className="share-state">hasn't joined yet</span>
+              <button type="button" className="signin-link" disabled={busy} onClick={() => void run(() => t.cancelPending(p.id))}>
+                cancel
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {needsInvite ? (
         <div className="share-invite">
           <p>
@@ -372,9 +431,9 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
           </button>
         </form>
       )}
-      {t.seats && !seatBox && !upgrading && (
+      {t.seats && !seatBox && !upgrading && !handOver && (
         <p className="sharing-offer">
-          Someone without an email address?{" "}
+          No email address?{" "}
           <button type="button" className="signin-link" disabled={busy} onClick={() => setSeatBox(true)}>
             make them a username and a code
           </button>
@@ -438,175 +497,108 @@ export function SharingPanel({ target: t, onClose }: { target: SharingTarget; on
           </div>
         </form>
       )}
-
-      {count > 0 && (
-        <ul className="share-people">
-          {active.map((p) => (
-            <li key={p.id}>
-              <Avatar person={p} size={26} />
-              <span className="share-name">
-                {p.name}
-                {p.seat && <span className="share-state"> · username and code</span>}
-              </span>
-              {p.seat && p.username && (
-                <button type="button" className="signin-link" disabled={busy} title="Copy a link that signs them in and lands here" onClick={() => void copyText(seatLink(path, p.username!))}>
-                  link
-                </button>
-              )}
-              {p.seat && t.seats && (
-                <>
-                  <button type="button" className="signin-link" disabled={busy} onClick={() => askNewCode(p)}>
-                    new code
-                  </button>
-                  <button
-                    type="button"
-                    className="signin-link"
-                    disabled={busy}
-                    onClick={() => {
-                      setError(null);
-                      setUpgrading(p);
-                    }}
-                  >
-                    full account
-                  </button>
-                </>
-              )}
-              <button type="button" className="signin-link" disabled={busy} onClick={() => askRemove(p)}>
-                remove
-              </button>
-            </li>
-          ))}
-          {pending.map((p) => (
-            <li key={p.id}>
-              <span className="avatar more" style={{ width: 26, height: 26, fontSize: 12 }}>
-                ?
-              </span>
-              <span className="share-name">{p.email}</span>
-              <span className="share-state">hasn't joined yet</span>
-              <button type="button" className="signin-link" disabled={busy} onClick={() => void run(() => t.cancelPending(p.id))}>
-                cancel
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </>
+    </section>
   );
+
+  // The link, once public, with a way to email it to someone.
+  const linkSection = (
+    <section className="sharing-section">
+      <h4>Link</h4>
+      <div className="sharing-link">
+        <code>{appLink(path)}</code>
+        <button
+          type="button"
+          className="primary"
+          onClick={() =>
+            void copyText(appLink(path)).then(() => {
+              setCopied(true);
+              setTimeout(() => setCopied(false), 1800);
+            })
+          }
+        >
+          {copied ? "copied" : "copy"}
+        </button>
+      </div>
+      {tellOpen ? (
+        <form onSubmit={sendPointer} className="sharing-add sharing-sub">
+          <input
+            autoFocus
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+            placeholder="@username or email"
+            value={tell}
+            onChange={(e) => setTell(e.target.value)}
+            disabled={busy}
+            aria-label="Username or email"
+          />
+          <button type="submit" className="primary" disabled={busy || !tell.trim()}>
+            {busy ? "…" : "send"}
+          </button>
+          <button type="button" className="signin-link" onClick={() => setTellOpen(false)} disabled={busy}>
+            cancel
+          </button>
+        </form>
+      ) : (
+        <p className="sharing-offer">
+          <button type="button" className="signin-link" disabled={busy} onClick={() => setTellOpen(true)}>
+            email the link to someone
+          </button>
+        </p>
+      )}
+    </section>
+  );
+
+  // The three levels, as flat rows. The one in force gets a "now" tag
+  // while another is picked, since nothing changes until Done.
+  const levelRow = (value: Level, title: string, why: string, off = false) => (
+    <label className={`sharing-level ${level === value ? "on" : ""} ${off ? "off" : ""}`}>
+      <input type="radio" name={`sharing-${t.id}`} checked={level === value} disabled={busy || off} onChange={() => setLevel(value)} />
+      <span>
+        <b>
+          {title}
+          {changed && current === value && <span className="sharing-now">now</span>}
+        </b>
+        <span className="sharing-why">{why}</span>
+      </span>
+    </label>
+  );
+  const publicOff = !t.canPublic && !t.isPublic;
 
   return (
     <div className="sharing">
       <div className="sharing-levels" role="radiogroup" aria-label="Who can see it">
-        {/* Only me */}
-        <label className={`sharing-level ${level === "me" ? "on" : ""}`}>
-          <input type="radio" name={`sharing-${t.id}`} checked={level === "me"} disabled={busy} onChange={() => setLevel("me")} />
-          <span>
-            <b>Only me</b>
-            <span className="sharing-why">
-              {level === "me" && current !== "me"
-                ? t.isPublic
-                  ? `Private: nobody else sees it. Press Done to make ${thing} private again${
-                      t.kind === "chat" && count > 0 ? `: ${count === 1 ? "the one person" : `all ${count} people`} below lose sight of it too` : ""
-                    }.`
-                  : `Private: nobody else sees it. Press Done to stop sharing: ${count === 1 ? "the one person" : `all ${count} people`} below lose sight of ${thing}.`
-                : t.kind === "chat"
-                  ? "Private: nobody else sees it, and it's on your credits."
-                  : "Private: only you can chat with it, and it's on your credits."}
-            </span>
-          </span>
-        </label>
-        {level === "me" && current !== "me" && count > 0 && (
-          <div className="sharing-people">
-            <PeopleList active={active} pending={pending} noteSeats />
-          </div>
+        {levelRow("me", "Only me", t.kind === "chat" ? "Private: nobody else sees it. It's on your credits." : "Private: only you chat with it. It's on your credits.")}
+        {levelRow(
+          "people",
+          "People I choose",
+          t.kind === "chat" ? "They see all of it and can write in it. You pay." : "They get their own chats with it; you see every one. You pay."
         )}
-
-        {/* People I choose */}
-        <label className={`sharing-level ${level === "people" ? "on" : ""}`}>
-          <input type="radio" name={`sharing-${t.id}`} checked={level === "people"} disabled={busy} onChange={() => setLevel("people")} />
-          <span>
-            <b>People I choose</b>
-            <span className="sharing-why">
-              {t.kind === "chat" ? "They see all of it and can keep it going. You pay." : "They get their own chats with it; you see every one. You pay."}
-              {current === "people" ? ` ${peopleSummary}` : ""}
-            </span>
-          </span>
-        </label>
-        {level === "people" && (
-          <div className="sharing-people">
-            {t.isPublic && <p className="sharing-why">It's public at the moment: anyone can read it, and the people here write in it. Press Done to make it theirs only.</p>}
-            {peopleEditor}
-          </div>
-        )}
-
-        {/* Everyone */}
-        <label className={`sharing-level ${level === "everyone" ? "on" : ""} ${!t.canPublic && !t.isPublic ? "off" : ""}`}>
-          <input type="radio" name={`sharing-${t.id}`} checked={level === "everyone"} disabled={busy || (!t.canPublic && !t.isPublic)} onChange={() => setLevel("everyone")} />
-          <span>
-            <b>Everyone on Lechuga</b>
-            <span className="sharing-why">
-              {!t.canPublic && !t.isPublic && t.publicReason
-                ? t.publicReason
-                : t.kind === "chat"
-                  ? "Anyone can read it. Only you and the people you choose can write in it. Lechuga pays."
-                  : "Anyone can chat with it, and every chat with it is public, yours so far included. Lechuga pays."}
-              {t.isPublic ? " It is public now." : ""}
-            </span>
-          </span>
-        </label>
-        {level === "everyone" && !t.isPublic && t.canPublic && (
-          <div className="sharing-people">
-            <p className="sharing-why">Press Done to make {thing} public. You'll be asked once, with the rules spelled out, and you can make it private again later.</p>
-          </div>
-        )}
-        {level === "everyone" && t.isPublic && (
-          <div className="sharing-people">
-            {t.kind === "chat" && (
-              <>
-                <p className="sharing-why">
-                  {count === 0 ? "Only you can write in it so far. Add people here to let them write too; everyone else reads." : "Only you and the people here can write in it; everyone else reads."}
-                </p>
-                {peopleEditor}
-              </>
-            )}
-            <div className="sharing-link">
-              <code>{appLink(path)}</code>
-              <button
-                type="button"
-                className="primary"
-                onClick={() =>
-                  void copyText(appLink(path)).then(() => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1800);
-                  })
-                }
-              >
-                {copied ? "copied" : "copy"}
-              </button>
-            </div>
-            <form onSubmit={sendPointer} className="sharing-add sharing-tell">
-              <span className="sharing-tell-label">Tell someone:</span>
-              <input
-                autoComplete="off"
-                autoCapitalize="none"
-                spellCheck={false}
-                placeholder="@username or email"
-                value={tell}
-                onChange={(e) => setTell(e.target.value)}
-                disabled={busy}
-                aria-label="Username or email"
-              />
-              <button type="submit" className="primary" disabled={busy || !tell.trim()}>
-                {busy ? "…" : "send"}
-              </button>
-            </form>
-            <p className="sharing-why">
-              {t.kind === "chat" ? "They get an email with the link, to read it. To let them write in it, add them above." : "They get an email with the link. Nothing else changes: public is everyone's already."}
-            </p>
-          </div>
+        {levelRow(
+          "everyone",
+          "Everyone on Lechuga",
+          publicOff && t.publicReason
+            ? t.publicReason
+            : t.kind === "chat"
+              ? "Anyone can read it. Only you and the people you choose write in it. Lechuga pays."
+              : "Anyone can chat with it, and every chat with it is public, yours so far included. Lechuga pays.",
+          publicOff
         )}
       </div>
+
+      {level === "me" && current !== "me" && count > 0 && (!t.isPublic || t.kind === "chat") && (
+        <section className="sharing-section">
+          <h4>Who loses it</h4>
+          <PeopleList active={active} pending={pending} noteSeats />
+        </section>
+      )}
+      {level === "people" && peopleEditor("Who has it")}
+      {level === "everyone" && t.isPublic && t.kind === "chat" && peopleEditor("Who can write")}
+      {level === "everyone" && t.isPublic && linkSection}
+
       {note && <p className="modal-ok">{note}</p>}
       {error && <p className="modal-error">{error}</p>}
+      {next && <p className="sharing-next">{next}</p>}
       {onClose && (
         <div className="modal-actions">
           <button type="button" className={changed ? "primary" : ""} onClick={done} disabled={busy}>

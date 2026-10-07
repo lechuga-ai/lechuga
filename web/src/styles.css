@@ -4144,11 +4144,13 @@ button {
   width: min(460px, 100%);
 }
 
-/* Sharing as a setting: three levels, the chosen one open underneath. */
+/* Sharing as a setting: three levels as flat rows. What the picked one
+   needs (who has it, the link) is a section under them, not nested in the
+   row. */
 .sharing-levels {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 /* Named with the modal and the settings page in front, so their own label
@@ -4161,9 +4163,9 @@ button {
   align-items: flex-start;
   gap: 12px;
   margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
   cursor: pointer;
   font-size: 14px;
   line-height: 1.4;
@@ -4179,7 +4181,7 @@ button {
 }
 
 .sharing-level.on {
-  border-color: rgba(111, 174, 59, 0.7);
+  border-color: rgba(111, 174, 59, 0.5);
   background: #f6f9f1;
 }
 
@@ -4191,7 +4193,25 @@ button {
 .sharing-level > span {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
+}
+
+.sharing-level b {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The level in force, while another is picked and Done not yet pressed. */
+.sharing-now {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(111, 174, 59, 0.15);
+  color: #4d7f25;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 .sharing-why {
@@ -4199,10 +4219,28 @@ button {
   color: var(--box-dim);
 }
 
-.sharing-people {
-  margin: 2px 0 6px 12px;
-  padding: 10px 12px 10px 14px;
-  border-left: 2px solid rgba(111, 174, 59, 0.5);
+/* A section under the levels: who has it, or the link. */
+.sharing-section {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.sharing-section h4 {
+  margin: 0 0 8px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--box-text);
+}
+
+.sharing-section .share-people {
+  margin: 0 0 10px;
+}
+
+.sharing-section .share-people li:first-child {
+  border-top: none;
+  padding-top: 2px;
 }
 
 .sharing-add {
@@ -4233,18 +4271,19 @@ button {
   margin-top: 10px;
 }
 
-/* Once public: the link, and "tell someone". */
-.modal p.sharing-public-lead,
-.doc-inner .settings-panel p.sharing-public-lead {
-  margin: 0 0 12px;
-  font-size: 13.5px;
+.modal .sharing-sub p,
+.doc-inner .settings-panel .sharing-sub p,
+.modal p.sharing-offer,
+.doc-inner .settings-panel p.sharing-offer {
+  margin: 8px 0 0;
+  font-size: 13px;
 }
 
+/* The link, once public. */
 .sharing-link {
   display: flex;
   gap: 8px;
   align-items: center;
-  margin-bottom: 14px;
 }
 
 .sharing-link code {
@@ -4258,6 +4297,13 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* What Done will do, when the pick isn't the level in force. */
+.modal p.sharing-next,
+.doc-inner .settings-panel p.sharing-next {
+  margin: 14px 0 0;
+  font-size: 13px;
 }
 
 /* The question before something that takes access away, in the panel's place. */
@@ -4292,29 +4338,6 @@ button {
 
 .share-people.compact li {
   padding: 5px 2px;
-}
-
-.sharing-tell-label {
-  font-size: 13.5px;
-  color: var(--box-text);
-}
-
-.sharing-tell + .sharing-why {
-  display: block;
-  margin-top: 6px;
-}
-
-.modal .sharing-sub p,
-.doc-inner .settings-panel .sharing-sub p,
-.modal p.sharing-offer,
-.doc-inner .settings-panel p.sharing-offer {
-  margin: 8px 0 8px;
-  font-size: 13px;
-}
-
-.sharing .share-people {
-  margin-top: 10px;
-  max-height: none;
 }
 
 .share-terms {
