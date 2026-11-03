@@ -71,6 +71,9 @@ export type Model = {
   blurb?: string;
   // Can look at pictures.
   vision?: boolean;
+  // What to send this model for each of our effort settings, when it isn't
+  // low/medium/high as is (worker/src/gateway.ts). The browser doesn't use it.
+  reasoning_effort?: Record<string, string>;
   // No longer offered; listed only so old chats on it show its name.
   retired?: boolean;
   credit_per_million_prompt_tokens: number;

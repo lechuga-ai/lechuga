@@ -3,7 +3,7 @@
     {
       "id": "@cf/zai-org/glm-5.3-flash",
       "label": "GLM 5.3 Flash",
-      "blurb": "The one to use. The best value of any open model we can run: quick, good at nearly everything, and the only one here that can look at pictures.",
+      "blurb": "The one to use. The best value of any open model we can run: quick, good at nearly everything, and it can look at pictures.",
       "vision": true,
       "credit_per_million_prompt_tokens": 3000,
       "credit_per_million_completion_tokens": 10000
@@ -16,9 +16,37 @@
       "credit_per_million_completion_tokens": 88000
     },
     {
+      "id": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+      "label": "DeepSeek V4.1 Flash",
+      "blurb": "A different lab's take, and the quickest here. It scores a little higher than Flash on the independent tests and costs about twice as much, so it's the second opinion to reach for first. It can look at pictures too.",
+      "vision": true,
+      "reasoning_effort": { "low": "low", "medium": "high", "high": "max" },
+      "credit_per_million_prompt_tokens": 6000,
+      "credit_per_million_completion_tokens": 24000
+    },
+    {
+      "id": "@cf/moonshotai/kimi-k2.7-code",
+      "label": "Kimi K2.7 Code",
+      "blurb": "Moonshot's trillion-parameter model, tuned for coding and for long jobs with tools, and it can look at pictures. It always thinks before answering, whatever effort you pick. Around eight times Flash's price; try it when Flash's code doesn't hold up.",
+      "vision": true,
+      "_comment": "reasoning_effort maps our effort ids to what the model accepts (worker/src/gateway.ts). Empty means the model takes no effort setting: Kimi K2.7 Code always thinks.",
+      "reasoning_effort": {},
+      "credit_per_million_prompt_tokens": 19000,
+      "credit_per_million_completion_tokens": 80000
+    },
+    {
+      "id": "@cf/qwen/qwen3.8-27b",
+      "label": "Qwen 3.8 27B",
+      "blurb": "Alibaba's small all-rounder, and it can look at pictures. On the independent tests it scores below Flash and costs about six times as much, so use it for a second opinion. Low effort still thinks a little here.",
+      "vision": true,
+      "reasoning_effort": { "low": "low", "medium": "medium", "high": "xhigh" },
+      "credit_per_million_prompt_tokens": 9000,
+      "credit_per_million_completion_tokens": 64000
+    },
+    {
       "id": "@cf/deepseek-ai/deepseek-v4-flash-0731",
       "label": "DeepSeek V4 Flash",
-      "blurb": "A different lab's take. It scores lower than Flash and costs more, so use it for a second opinion, not as your default.",
+      "retired": true,
       "credit_per_million_prompt_tokens": 8800,
       "credit_per_million_completion_tokens": 26400
     },

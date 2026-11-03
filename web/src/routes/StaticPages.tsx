@@ -84,6 +84,30 @@ type NewsEntry = { date: string; title: string; intro: string; items: { lead: st
 
 const NEWS: NewsEntry[] = [
   {
+    date: "October 29, 2026",
+    title: "Two more models, a newer DeepSeek, and all of them can see",
+    intro:
+      "Kimi K2.7 Code from Moonshot and Qwen 3.8 27B from Alibaba join the list under the message box, and DeepSeek V4 Flash gives way to V4.1. Every model here can look at pictures now, not only GLM 5.3 Flash.",
+    items: [
+      {
+        lead: "DeepSeek V4.1 Flash.",
+        text: "Newer, cheaper and quicker than the V4 Flash it replaces, and it scores a little higher than Flash on the independent tests at about twice the price. Chats already on V4 Flash carry on as they were. Its effort settings run low, high and max, so our medium is its high and our high its max.",
+      },
+      {
+        lead: "Kimi K2.7 Code.",
+        text: "A trillion-parameter model tuned for coding and for long jobs with tools. It always thinks before it answers, so the effort setting makes no difference on it. Around eight times Flash's price; try it when Flash's code doesn't hold up.",
+      },
+      {
+        lead: "Qwen 3.8 27B.",
+        text: "A small all-rounder. On the independent tests it scores below Flash and costs about six times as much, so treat it as a second opinion. Its effort settings don't line up with ours exactly: low still thinks a little, and high is its hardest.",
+      },
+      {
+        lead: "Flash is still the default.",
+        text: "Nothing changes for the model you're on. The guide under the ? says what each one is for and what it costs next to Flash, and the home page has the independent scores, brought up to date.",
+      },
+    ],
+  },
+  {
     date: "October 6, 2026",
     title: "Public chats: everyone reads, the people you chose write",
     intro:
