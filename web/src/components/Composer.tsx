@@ -469,8 +469,12 @@ function FileDrawing({ kind }: { kind: "text" | "markdown" | "table" | "data" | 
 
 // Covers the page while a file is being dragged over it.
 function DropMask() {
+  const seeing = config.models
+    .filter((m) => "vision" in m && m.vision && !("retired" in m && m.retired))
+    .map((m) => m.label)
+    .join(", ");
   const kinds = [
-    { kind: "picture", label: "Pictures", detail: "on GLM 5.3 Flash" },
+    { kind: "picture", label: "Pictures", detail: `on ${seeing}` },
     { kind: "document", label: "PDF and Office", detail: ".pdf .docx .xlsx" },
     { kind: "text", label: "Text and notes", detail: ".txt .log" },
     { kind: "markdown", label: "Markdown", detail: ".md" },

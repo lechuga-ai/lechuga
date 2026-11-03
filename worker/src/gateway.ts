@@ -71,8 +71,7 @@ export async function streamChat(
         stream: true,
         stream_options: { include_usage: true },
         ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
-        // How much the model thinks before answering: low, medium or high.
-        ...(opts.effort ? { reasoning_effort: opts.effort } : {}),
+        ...reasoningEffort(model, opts.effort),
         ...(opts.tools?.length ? { tools: opts.tools, tool_choice: "auto" } : {}),
       }),
       signal: abort.signal,
@@ -111,6 +110,20 @@ export async function streamChat(
   })();
 
   return { stream: forClient, usage };
+}
+
+// How much the model thinks before answering. Ours are low, medium and
+// high, which GLM takes as they are. A model whose config entry has a
+// reasoning_effort map gets the mapped value instead (Qwen's top setting is
+// "xhigh"; DeepSeek has no medium, so ours becomes its high and our high its
+// max), and an effort the map leaves out is not sent at all (Kimi K2.7 Code
+// always thinks and takes no effort setting).
+function reasoningEffort(model: string, effort?: string): { reasoning_effort?: string } {
+  if (!effort) return {};
+  const entry = config.models.find((m) => m.id === model);
+  if (!entry || !("reasoning_effort" in entry)) return { reasoning_effort: effort };
+  const mapped = (entry.reasoning_effort as Record<string, string | undefined>)[effort];
+  return mapped ? { reasoning_effort: mapped } : {};
 }
 
 // Errors the stream when nothing has arrived for `ms`. Downstream, parseSSE

@@ -8,7 +8,7 @@ import { GUARDED_PROMPT } from "./guard";
 // builds one per reply; trial.ts builds a bare one for the home page's free
 // chat.
 //
-// Written for the open models we run (GLM, DeepSeek): short plain sentences,
+// Written for the open models we run (GLM, DeepSeek, Kimi, Qwen): short plain sentences,
 // each subject settled once, with the reason only where it changes what the
 // model does. Things it can't know on its own come first (what day it is,
 // where people are), then what it may do, then how to be.

@@ -43,7 +43,7 @@ export const HOME_SECTIONS: Section[] = [
     paragraphs: [
       {
         text:
-          "Lechuga is a chat assistant, the kind where you type a question into a box and get an answer, with your past chats down the left side so you can come back to them. Under the hood it runs open source AI models (currently GLM 5.3 Flash and GLM 5.3 from Z.ai, and DeepSeek V4 Flash) on Cloudflare's infrastructure.",
+          "Lechuga is a chat assistant, the kind where you type a question into a box and get an answer, with your past chats down the left side so you can come back to them. Under the hood it runs open source AI models (currently GLM 5.3 Flash and GLM 5.3 from Z.ai, DeepSeek V4.1 Flash, Kimi K2.7 Code from Moonshot, and Qwen 3.8 27B from Alibaba) on Cloudflare's infrastructure.",
       },
       {
         text:
@@ -102,7 +102,7 @@ export const HOME_SECTIONS: Section[] = [
       {
         lead: "The models are good, though not the very best.",
         text:
-          "On Artificial Analysis's independent Intelligence Index, GLM 5.3 Flash, the model Lechuga uses by default, scores 42. The very best models from OpenAI and Anthropic score 53, and cost more than ten times as much per task to get there (September 2026). You'll notice the difference on hard coding and research problems, and on most everyday things you won't.",
+          "On Artificial Analysis's independent Intelligence Index, GLM 5.3 Flash, the model Lechuga uses by default, scores 28, and DeepSeek V4.1 Flash 32. The very best models from Google, Anthropic and OpenAI score 57 to 59, and cost more than ten times as much per task to get there (October 2026). You'll notice the difference on hard coding and research problems, and on most everyday things you won't.",
         source: { label: "artificialanalysis.ai", href: "https://artificialanalysis.ai/leaderboards/models" },
       },
       {

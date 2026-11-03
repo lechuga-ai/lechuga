@@ -86,7 +86,7 @@ export function HelpPage({ me }: Props) {
         <ol className="help-steps">
           <li>Type in the box and send. That's the whole interface.</li>
           <li>Your past chats are on the left; click one to go back to it, or start a new one any time.</li>
-          <li>Drag a file onto the page (a PDF, a document, a spreadsheet, code, or a picture if you're on GLM 5.3 Flash), or paste in something long, and it becomes a card attached to your message.</li>
+          <li>Drag a file onto the page (a PDF, a document, a spreadsheet, code, or a picture if your model can see them: GLM 5.3 Flash, DeepSeek, Kimi and Qwen can), or paste in something long, and it becomes a card attached to your message.</li>
           <li>Next to the model is how hard it should think. Low is quick and cheap; high is slower and better on hard problems. The ? beside them explains both.</li>
           <li>Pick a model under the box before you start a chat. A chat keeps the model it started with.</li>
           <li>Bots are the groups on the left, each with its chats under it. The dots beside a bot's name start a new chat with it, share it, or open it in Bot Manager; the dots beside a chat share it, copy its link, or delete it.</li>

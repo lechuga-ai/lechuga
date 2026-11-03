@@ -4,6 +4,12 @@ import { SideNavPage, type NavGroup } from "../components/SideNavPage";
 import { HOME_SECTIONS } from "./HomePage";
 import config from "../../../worker/config.json";
 
+// The models that can look at pictures, named in prose: "A, B and C".
+const SEEING = config.models
+  .filter((m) => "vision" in m && m.vision && !("retired" in m && m.retired))
+  .map((m) => m.label)
+  .reduce((text, label, i, all) => (i === 0 ? label : i === all.length - 1 ? `${text} and ${label}` : `${text}, ${label}`), "");
+
 // /help/getting-started: a plain guide to using a chat model well, for
 // people who haven't spent much time with one. Linked from the footer, Help,
 // and the "?" beside the model name. Each section is a question someone has
@@ -239,7 +245,7 @@ export const GETTING_STARTED_SECTIONS: { id: string; title: string; body: ReactN
     body: (
       <>
         <p>
-          Several of the best open models, including the GLM and DeepSeek models here, were trained by labs in China.
+          Several of the best open models, including the GLM, DeepSeek, Kimi and Qwen models here, were trained by labs in China.
           It's worth separating two things: who made the model, and whose computers run it.
         </p>
         <p>
@@ -295,7 +301,7 @@ export const GETTING_STARTED_SECTIONS: { id: string; title: string; body: ReactN
         <p>
           Yes. Drag a file onto the page, or paste in something long, and it becomes a small card on your message.
           PDFs, Word and Excel files, text, CSV and code all work; a scanned PDF doesn't, because a scan is a picture
-          of words with no words in it. Pictures work on GLM 5.3 Flash, the one model here that can see.
+          of words with no words in it. Pictures work on {SEEING}, the models here that can see.
         </p>
         <p>
           It reads the whole file, which is the good news and the cost: a long document is re-read, and paid for, with
